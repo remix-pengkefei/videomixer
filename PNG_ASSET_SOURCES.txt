@@ -1,0 +1,505 @@
+================================================================================
+FREE TRANSPARENT PNG ASSET SOURCES - Research Results
+For: VideoMixer Project
+Date: 2026-02-06
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. TIER 1 - Best Sources (Direct Downloads, No Signup)
+2. TIER 2 - Excellent Sources (Large Libraries, May Require Free Account)
+3. TIER 3 - Chinese Language Sources
+4. CATEGORY-SPECIFIC URL INDEX
+5. DIRECT DOWNLOAD LINKS (Bulk Packs)
+6. URL PATTERNS FOR PROGRAMMATIC ACCESS
+
+================================================================================
+1. TIER 1 - BEST SOURCES (Direct Downloads, Minimal Friction)
+================================================================================
+
+--- PNGIMG.COM ---
+URL: https://pngimg.com/
+Content: 100,000+ free PNG images with transparent backgrounds
+License: CC BY-NC 4.0 (Attribution-NonCommercial)
+Signup: NOT required
+Anti-scraping: Minimal - direct download URLs available
+Download URL pattern:
+  - Browse:    https://pngimg.com/images/{category}/{subcategory}
+  - Detail:    https://pngimg.com/image/{ID}
+  - Thumbnail: https://pngimg.com/uploads/{name}/small/{name}_PNG{ID}.png
+  - Full size: https://pngimg.com/uploads/{name}/{name}_PNG{ID}.png
+  - Download:  https://pngimg.com/d/{name}_PNG{ID}.png
+
+Relevant categories for VideoMixer:
+  Stars:         https://pngimg.com/images/objects/star (255 images)
+  Hearts:        https://pngimg.com/images/objects/heart
+  Ribbons:       https://pngimg.com/images/objects/ribbon
+  Bows:          https://pngimg.com/images/miscellaneous/bow
+  Butterflies:   https://pngimg.com/images/insects/butterfly
+  Dragonflies:   https://pngimg.com/images/insects/dragonfly
+  Roses:         https://pngimg.com/images/flowers/rose
+  Sunflowers:    https://pngimg.com/images/flowers/sunflower
+  Tulips:        https://pngimg.com/images/flowers/tulip
+  Sakura:        https://pngimg.com/images/nature/sakura
+  Green leaves:  https://pngimg.com/images/nature/green_leaves
+  Autumn leaves: https://pngimg.com/images/nature/autumn_leaves
+  Floral frames: https://pngimg.com/images/flowers/floral_frame
+  Picture frame: https://pngimg.com/images/miscellaneous/picture_frame
+  Light:         https://pngimg.com/images/nature/light
+  Fire/Flame:    https://pngimg.com/images/nature/fire
+  Smoke:         https://pngimg.com/images/nature/smoke
+  Lightning:     https://pngimg.com/images/nature/lightning
+  Bokeh:         https://pngimg.com/images/miscellaneous/bokeh
+  Confetti:      https://pngimg.com/images/holidays/confetti
+  Fireworks:     https://pngimg.com/images/holidays/fireworks
+  Snowflakes:    https://pngimg.com/images/nature/snowflakes
+  Soap bubbles:  https://pngimg.com/images/miscellaneous/soap_bubbles
+  Wings:         https://pngimg.com/images/fantasy/wings
+  Rainbow:       https://pngimg.com/images/nature/rainbow
+  Clouds:        https://pngimg.com/images/nature/cloud
+  Birds:         https://pngimg.com/images/animals/birds
+  White Dove:    https://pngimg.com/images/animals/white_dove
+  Hummingbird:   https://pngimg.com/images/animals/hummingbird
+  Swallow:       https://pngimg.com/images/animals/swallow
+  Swan:          https://pngimg.com/images/animals/swan
+  Balloon:       https://pngimg.com/images/objects/balloon
+  Love symbol:   https://pngimg.com/images/symbols/love
+  Broken heart:  https://pngimg.com/images/symbols/broken_heart
+  Party flags:   https://pngimg.com/images/miscellaneous/party_flags
+  Garlands:      https://pngimg.com/images/holidays/christmas_garland
+  Light garland: https://pngimg.com/images/holidays/lights_garland
+  Tinsel:        https://pngimg.com/images/holidays/tinsel
+
+Example direct download URLs:
+  https://pngimg.com/d/star_PNG1592.png (star, 2000x2037, 138KB)
+  https://pngimg.com/d/star_PNG41495.png (star, 2400x2400)
+
+
+--- RESOURCE BOY ---
+URL: https://resourceboy.com/
+Content: High-quality bulk overlay/texture packs
+License: Personal & Commercial use (free)
+Signup: NOT required - direct ZIP downloads
+Anti-scraping: None - direct file URLs
+
+DIRECT DOWNLOAD LINKS (all verified, no signup):
+  Lens Flares (200+, 4K):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Lens-Flare-Overlays.zip
+
+  Light Leaks (250, 8K):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Light-Leak-Overlays.zip
+
+  Fireworks (250, 4K):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Fireworks-Textures.zip
+
+  Shadow Overlays (100, PNG transparent):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Shadow-Overlays.zip
+
+  Grunge Frames & Borders (120+, PNG):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Grunge-Frame-Textures.zip
+
+  Splatter Textures (100, 4K PNG transparent):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Splatter-Textures.zip
+
+  Glitch Overlays (200, 4K):
+    https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Glitch-Overlays.zip
+
+
+--- STICKPNG ---
+URL: https://www.stickpng.com/
+Content: 56,981 free transparent PNGs
+License: Personal/non-commercial/educational
+Signup: NOT required
+Categories: Animals, Nature, Holidays, Icons, Miscellaneous
+Browse: https://www.stickpng.com/cat/{category-slug}?page=1
+
+
+--- CLIPART LIBRARY ---
+URL: https://clipart-library.com/
+Content: Free clipart with transparent backgrounds
+License: Free for school/personal projects
+Pages:
+  Transparent borders: https://clipart-library.com/free/transparent-frames-and-borders.html
+  Decorative borders:  https://clipart-library.com/free/transparent-decorative-border.html
+  No-background clips: https://clipart-library.com/no-background-clipart.html
+
+
+================================================================================
+2. TIER 2 - EXCELLENT SOURCES (Large Libraries)
+================================================================================
+
+--- VECTEEZY ---
+URL: https://www.vecteezy.com/
+Content: Massive library, royalty-free
+License: Free with attribution (Vecteezy license)
+Key search pages:
+  Sparkles:         https://www.vecteezy.com/free-png/sparkle (65,895 PNGs)
+  Glitter Stars:    https://www.vecteezy.com/free-png/glitter-stars (4,404 PNGs)
+  Lens Flare:       https://www.vecteezy.com/free-png/lens-flare (3,979 PNGs)
+  Frame Border:     https://www.vecteezy.com/free-png/frame-border (91,359 PNGs)
+  Borders:          https://www.vecteezy.com/free-png/border (127,207 PNGs)
+  Stickers:         https://www.vecteezy.com/free-png/sticker (294,413 PNGs)
+  Clipart:          https://www.vecteezy.com/free-png/clipart (339,476 PNGs)
+  Overlay:          https://www.vecteezy.com/free-png/overlay (54,247 PNGs)
+  Transparent Ovly: https://www.vecteezy.com/free-png/transparent-overlays (46,153 PNGs)
+  Geometric Pattern:https://www.vecteezy.com/free-png/geometric-pattern (57,560 PNGs)
+  Geometric Overlay:https://www.vecteezy.com/free-png/geometric-overlay (6,323 PNGs)
+  Abstract Shapes:  https://www.vecteezy.com/free-png/abstract-shapes (167,864 PNGs)
+Note: Some images are "Pro" (paid), but many are free with attribution.
+
+
+--- PNGTREE ---
+URL: https://pngtree.com/
+Content: Millions of PNG, vector, PSD resources
+License: Free tier available (daily download limits)
+Signup: Free account recommended for higher limits
+Key pages:
+  Stickers:   https://pngtree.com/free-png-vectors/sticker (100,000+ items)
+  Clipart:    https://pngtree.com/free-clipart
+  Sparkle:    https://pngtree.com/free-png-vectors/sparkle
+  Overlay:    https://pngtree.com/so/overlay
+  Borders:    https://pngtree.com/so/border-frame
+  Geometric:  https://pngtree.com/free-png-vectors/geometric (72,070+ items)
+  Geo Pattern:https://pngtree.com/free-png-vectors/geometric-pattern (6,231 items)
+  Glitter:    https://pngtree.com/free-png-vectors/glitter-overlay
+  Bokeh:      https://pngtree.com/so/glitter-bokeh
+
+
+--- FREEPIK ---
+URL: https://www.freepik.com/
+Content: Vectors, stock photos, PSD, PNG
+License: Free with attribution
+Key pages:
+  Sticker PNG:  https://www.freepik.com/free-photos-vectors/sticker-png
+  Lens flare:   https://www.freepik.com/free-photos-vectors/lens-flare-png
+  Geo patterns: https://www.freepik.com/free-photos-vectors/geometric-pattern-transparent
+  Glitter bokeh:https://www.freepik.com/free-photos-vectors/glitter-bokeh-png
+
+
+--- RAWPIXEL ---
+URL: https://www.rawpixel.com/
+Content: Free stock photos, PNGs, vectors
+License: Free for personal/commercial use (varies)
+Key search pages:
+  Sparkling star:  https://www.rawpixel.com/search/sparkling%20star%20png
+  Sparkle:         https://www.rawpixel.com/search/sparkle
+  Glitter:         https://www.rawpixel.com/search/glitter%20png
+  Lens flare:      https://www.rawpixel.com/search/lens%20flare%20png
+  Bokeh:           https://www.rawpixel.com/search/bokeh%20transparent%20png
+  Vintage sticker: https://www.rawpixel.com/search/vintage%20sticker%20transparent%20png
+
+
+--- CLEANPNG ---
+URL: https://www.cleanpng.com/
+Content: High-quality transparent PNG images
+License: Personal use
+Key pages:
+  Sparkle:    https://www.cleanpng.com/free/sparkle.html (3,000 images)
+  Sticker:    https://www.cleanpng.com/free/sticker.html
+  Geo Shapes: https://www.cleanpng.com/free/geometric-shapes.html (3,000 images)
+  Borders:    https://www.cleanpng.com/free/borders-and-frames.html
+  Border:     https://www.cleanpng.com/free/border.html
+Use search for: stars, hearts, butterflies, flowers, etc.
+
+
+--- OTHER NOTABLE SITES ---
+
+PNGFIND:     https://www.pngfind.com/  (Free HD PNGs, unlimited downloads)
+  Sticker:   https://www.pngfind.com/freepng/sticker/
+  Overlay:   https://www.pngfind.com/freepng/overlay/
+  Geometric: https://www.pngfind.com/freepng/geometric/
+  Lens flare:https://www.pngfind.com/freepng/lens-flare-png/
+
+PNGKEY:      https://www.pngkey.com/  (Personal/non-commercial use)
+  Sticker:   https://www.pngkey.com/pngs/sticker/
+  Lens flare:https://www.pngkey.com/pngs/lens-flare/
+  Free clip: https://www.pngkey.com/pngs/free-clipart/
+
+KINDPNG:     https://www.kindpng.com/  (Free transparent PNGs)
+  Sticker:   https://www.kindpng.com/free/sticker/
+  Border:    https://www.kindpng.com/free/border-frame/ (1,934 images)
+
+PNGMART:     https://www.pngmart.com/  (High-quality free PNGs)
+  Sticker:   https://www.pngmart.com/image/tag/sticker
+
+NICEPNG:     https://www.nicepng.com/  (HD transparent PNGs, commercial OK)
+
+HICLIPART:   https://www.hiclipart.com/  (Unlimited free download)
+
+FLYCLIPART:  https://flyclipart.com/  (Free transparent clipart)
+
+CLIPARTMAX:  https://www.clipartmax.com/  (Largest transparent clipart collection)
+
+FAVPNG:      https://favpng.com/  (Free PNG with transparent backgrounds)
+  Geometric: https://favpng.com/png_search/geometric
+
+PIXABAY:     https://pixabay.com/  (Free stock, some transparent PNGs)
+  Overlays:  https://pixabay.com/images/search/transparent%20overlay/
+
+FREEICONSPNG: https://www.freeiconspng.com/
+  Lens flare: https://www.freeiconspng.com/images/lens-flare-png
+  URL pattern: https://www.freeiconspng.com/img/{ID}
+
+LOVEPIK:     https://lovepik.com/  (Glitter/bokeh PNGs)
+  Glitter:   https://lovepik.com/images/png-glitter-bokeh.html
+
+CITYPNG:     https://www.citypng.com/  (High-res overlays)
+
+SIMILARPNG:  https://similarpng.com/  (Free high-quality PNGs)
+
+PNGDOWNLOAD: https://pngdownload.io/  (Transparent PNG downloads)
+
+FIXTHEPHOTO: https://fixthephoto.com/glitter-overlay (110 glitter overlays set)
+
+PSDDUDE:     https://www.psd-dude.com/tutorials/resources/bokeh-lights-textures-for-free.aspx
+             (50+ free bokeh overlays)
+
+SPECKYBOY:   https://speckyboy.com/free-photo-overlays-photographers/
+             (500+ free overlays for photographers & video creators)
+
+
+================================================================================
+3. CHINESE LANGUAGE SOURCES (免抠PNG素材)
+================================================================================
+
+--- 免抠素材网 (MkSucai) ---
+URL: https://www.mksucai.com
+Content: 500万+ PNG素材, 50万+ 高清背景
+License: Free downloads available
+Categories:
+  花朵 (Flowers): /sc/花朵.html
+  花纹 (Patterns): /sc/花纹.html
+  水彩 (Watercolor): /sc/水彩.html
+  PNG images: /list/png.html
+  Backgrounds: /list/images.html
+
+--- 摄图网 (699pic) ---
+URL: https://699pic.com/sucai/
+Content: 1724万 海量正版内容
+License: Free daily downloads, registration gives 149元 coupon
+Note: Requires account for downloads
+
+--- 免抠素材网 (Miankousucai) ---
+URL: https://www.miankousucai.com/
+Content: Completely free PNG downloads
+License: Free for personal & commercial use, free fonts
+Note: Best Chinese free option - no payment required
+
+--- 觅元素 (51yuansu) ---
+URL: https://www.51yuansu.com/
+Content: Free PNG素材 and HD backgrounds
+License: Free tier available
+Note: SSL certificate issues may occur
+
+--- PNGDirs ---
+URL: https://www.pngdirs.com/
+Content: 10万+ transparent PNG images
+License: Free download
+Note: Bilingual (Chinese/English)
+
+--- 爱给网 (Aigei) ---
+URL: https://www.aigei.com/element/element/
+Content: Free transparent PNG elements
+License: Free downloads
+
+--- 熊猫办公 (Tukuppt/Panda Office) ---
+URL: https://www.tukuppt.com/yuansu/
+Content: PNG elements, backgrounds, templates
+License: Subscription-based, some free
+
+--- 图精灵 (616pic) ---
+URL: https://616pic.com/tupian/miankou.html
+Content: Free PNG transparent images
+License: Free
+
+--- IMGBIN ---
+URL: Referenced by UISDC (https://www.uisdc.com/imgbin)
+Content: 1200万+ free PNG images globally
+License: Free, high-resolution
+
+
+================================================================================
+4. CATEGORY-SPECIFIC URL INDEX
+================================================================================
+
+STARS, SPARKLES, GLITTER EFFECTS:
+  pngimg.com/images/objects/star
+  vecteezy.com/free-png/sparkle
+  vecteezy.com/free-png/glitter-stars
+  cleanpng.com/free/sparkle.html
+  pngtree.com/free-png-vectors/sparkle
+  rawpixel.com/search/sparkle
+  rawpixel.com/search/glitter%20png
+  pngtree.com/free-png-vectors/glitter-overlay
+
+FLOWERS, LEAVES, NATURE:
+  pngimg.com/images/flowers/rose
+  pngimg.com/images/flowers/sunflower
+  pngimg.com/images/flowers/tulip
+  pngimg.com/images/flowers/floral_frame
+  pngimg.com/images/nature/sakura
+  pngimg.com/images/nature/green_leaves
+  pngimg.com/images/nature/autumn_leaves
+  pngimg.com/images/flowers/dandelion
+  pngimg.com/images/flowers/chamomile (camomile)
+  pngimg.com/images/flowers/lotus_flower
+  pngimg.com/images/flowers/bouquet
+  pngimg.com/images/flowers/lilium
+  pngimg.com/images/flowers/poppy
+  pngimg.com/images/flowers/viola
+  pngimg.com/images/flowers/white_roses
+
+HEARTS, LOVE DECORATIONS:
+  pngimg.com/images/objects/heart
+  pngimg.com/images/symbols/love
+  pngimg.com/images/symbols/broken_heart
+  pngimg.com/images/holidays/valentines_day
+
+BUTTERFLIES, BIRDS:
+  pngimg.com/images/insects/butterfly
+  pngimg.com/images/insects/dragonfly
+  pngimg.com/images/animals/birds
+  pngimg.com/images/animals/white_dove
+  pngimg.com/images/animals/hummingbird
+  pngimg.com/images/animals/swallow
+  pngimg.com/images/animals/swan
+  pngimg.com/images/animals/parrot
+  pngimg.com/images/animals/eagle
+
+RIBBONS, BOWS, DECORATIVE:
+  pngimg.com/images/objects/ribbon
+  pngimg.com/images/miscellaneous/bow
+  pngimg.com/images/miscellaneous/party_flags
+  pngimg.com/images/holidays/confetti
+  pngimg.com/images/holidays/tinsel
+  pngimg.com/images/objects/balloon
+
+LIGHT EFFECTS, LENS FLARES:
+  pngimg.com/images/nature/light
+  pngimg.com/images/nature/lightning
+  pngimg.com/images/nature/fire
+  pngimg.com/images/nature/flame
+  pngimg.com/images/miscellaneous/bokeh
+  pngimg.com/images/holidays/fireworks
+  vecteezy.com/free-png/lens-flare
+  freeiconspng.com/images/lens-flare-png
+  rawpixel.com/search/lens%20flare%20png
+  freepik.com/free-photos-vectors/lens-flare-png
+  rawpixel.com/search/bokeh%20transparent%20png
+  lovepik.com/images/png-glitter-bokeh.html
+
+BORDERS, FRAMES:
+  pngimg.com/images/flowers/floral_frame
+  pngimg.com/images/miscellaneous/picture_frame
+  vecteezy.com/free-png/frame-border
+  vecteezy.com/free-png/border
+  cleanpng.com/free/borders-and-frames.html
+  clipart-library.com/free/transparent-frames-and-borders.html
+  clipart-library.com/free/transparent-decorative-border.html
+  kindpng.com/free/border-frame/
+
+ABSTRACT SHAPES, GEOMETRIC PATTERNS:
+  vecteezy.com/free-png/geometric-pattern
+  vecteezy.com/free-png/geometric-overlay
+  vecteezy.com/free-png/abstract-shapes
+  pngtree.com/free-png-vectors/geometric
+  pngtree.com/free-png-vectors/geometric-pattern
+  cleanpng.com/free/geometric-shapes.html
+  favpng.com/png_search/geometric
+  freepik.com/free-photos-vectors/geometric-pattern-transparent
+
+SMOKE, CLOUDS, ATMOSPHERIC:
+  pngimg.com/images/nature/smoke
+  pngimg.com/images/nature/cloud
+  pngimg.com/images/nature/rain
+  pngimg.com/images/nature/snow
+
+HOLIDAY/SEASONAL (bonus):
+  pngimg.com/images/holidays/christmas
+  pngimg.com/images/holidays/christmas_garland
+  pngimg.com/images/holidays/lights_garland
+  pngimg.com/images/holidays/christmas_wreath
+  pngimg.com/images/holidays/christmas_ball
+
+
+================================================================================
+5. VERIFIED DIRECT DOWNLOAD LINKS (Bulk Packs - No Signup)
+================================================================================
+
+These are confirmed working direct download URLs requiring NO signup:
+
+LENS FLARE OVERLAYS (200+, 4K resolution):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Lens-Flare-Overlays.zip
+
+LIGHT LEAK OVERLAYS (250, 8K resolution):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Light-Leak-Overlays.zip
+
+FIREWORKS TEXTURES (250, 4K, JPG):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Fireworks-Textures.zip
+
+SHADOW OVERLAYS (100, PNG transparent):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Shadow-Overlays.zip
+
+GRUNGE FRAMES & BORDERS (120+, PNG):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Grunge-Frame-Textures.zip
+
+SPLATTER TEXTURES (100, 4K, PNG transparent):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Splatter-Textures.zip
+
+GLITCH OVERLAYS (200, 4K):
+https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-Glitch-Overlays.zip
+
+
+================================================================================
+6. URL PATTERNS FOR PROGRAMMATIC ACCESS
+================================================================================
+
+PNGIMG.COM (easiest for programmatic access):
+  List page:  https://pngimg.com/images/{category}/{subcategory}
+  Image page: https://pngimg.com/image/{numeric_id}
+  Thumbnail:  https://pngimg.com/uploads/{name}/small/{name}_PNG{id}.png
+  Full image: https://pngimg.com/uploads/{name}/{name}_PNG{id}.png
+  Download:   https://pngimg.com/d/{name}_PNG{id}.png
+
+FREEICONSPNG.COM:
+  Category:   https://www.freeiconspng.com/images/{category}-png
+  Image page: https://www.freeiconspng.com/img/{numeric_id}
+
+RESOURCE BOY (bulk packs):
+  Pattern: https://files.resourceboy.com/file/rb-downloads/textures/Resource-Boy-{Pack-Name}.zip
+
+VECTEEZY:
+  Browse: https://www.vecteezy.com/free-png/{search-term}
+  Note: Individual downloads require clicking through to image page
+
+CLEANPNG:
+  Browse: https://www.cleanpng.com/free/{search-term}.html
+
+PNGFIND:
+  Browse: https://www.pngfind.com/freepng/{search-term}/
+
+
+================================================================================
+RECOMMENDATIONS FOR VIDEOMIXER PROJECT
+================================================================================
+
+PRIORITY 1 (Start here):
+  - Resource Boy bulk packs: Instant ZIP downloads, no signup, commercial OK
+    Best for: lens flares, light leaks, frames/borders, splatter effects
+
+  - pngimg.com: Direct PNG URLs, CC BY-NC license, 100K+ images
+    Best for: stars, hearts, flowers, butterflies, birds, ribbons, nature
+
+PRIORITY 2 (Rich libraries):
+  - Vecteezy: Enormous free collection with attribution license
+  - Rawpixel: Quality sparkle/glitter/bokeh PNGs
+  - CleanPNG: Good sparkle and geometric shape collections
+
+PRIORITY 3 (Supplementary):
+  - StickPNG, PNGFind, PNGKey, KindPNG for specific items
+  - Chinese sites (miankousucai.com, mksucai.com) for additional variety
+  - Speckyboy article for curated overlay collections
+
+================================================================================
+END OF RESEARCH
+================================================================================

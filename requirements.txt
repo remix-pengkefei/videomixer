@@ -1,0 +1,13 @@
+# VideoMixer 依赖
+# 注意: tkinter 是 Python 内置模块，无需安装
+
+# 基础依赖（Python 标准库）
+# - tkinter (GUI)
+# - subprocess (调用 ffmpeg)
+# - json, pathlib, threading 等
+
+# 外部依赖
+# 无 - 使用纯 Python 标准库实现
+
+# 系统依赖 (需要预装)
+# - ffmpeg: brew install ffmpeg
