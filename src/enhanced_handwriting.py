@@ -12,7 +12,8 @@ from src.sticker_pool import (
     get_rotated_stickers, get_sparkle_overlays, get_sticker_pool_info,
     get_color_scheme, get_mask_filters, get_particle_filters,
     get_decoration_filters, get_border_filters, get_color_preset,
-    get_audio_filters,
+    get_audio_filters, get_lut_filters, get_speed_ramp,
+    get_lens_effect, get_glitch_effect,
 )
 
 
@@ -46,15 +47,30 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         color_preset = "null"
         preset_name = "无"
 
+    # 获取 LUT 风格化
+    if config.get('enable_lut', True):
+        lut_filter, lut_name = get_lut_filters(video_type, video_index)
+    else:
+        lut_filter = "null"
+        lut_name = "无"
+
+    # 获取变速曲线
+    if config.get('enable_speed_ramp', True):
+        speed_video, speed_audio, speed_name = get_speed_ramp(video_index)
+    else:
+        speed_video = "null"
+        speed_audio = "anull"
+        speed_name = "无"
+
     top_h = 200
     bottom_h = 220
     by = h - bottom_h
 
-    # 1. 缩放 + 调色
+    # 1. 缩放 + 变速 + 调色 + LUT
     filters.append(
         f"[0:v]scale={w}:{h}:force_original_aspect_ratio=decrease,"
         f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
-        f"{color_preset}[base]"
+        f"{speed_video},{color_preset},{lut_filter}[base]"
     )
 
     # 2. 遮罩（轮换形态）
@@ -92,8 +108,16 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         particle_style = "无"
         filters.append(f"[v4]null[v5]")
 
-    # 6. 叠加贴纸
-    current = "[v5]"
+    # 6. 镜头效果
+    if config.get('enable_lens_effect', True):
+        lens_str, lens_name = get_lens_effect(video_type, video_index)
+        filters.append(f"[v5]{lens_str}[v5a]")
+    else:
+        lens_name = "无"
+        filters.append(f"[v5]null[v5a]")
+
+    # 7. 叠加贴纸
+    current = "[v5a]"
     input_idx = 1
 
     positions = [
@@ -141,9 +165,17 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         current = out
         input_idx += 1
 
-    # 最终输出
-    final = filters[-1]
-    filters[-1] = final.rsplit('[', 1)[0] + '[vout]'
+    # 9. 故障特效（最后一步后处理）
+    if config.get('enable_glitch', True):
+        glitch_str, glitch_name = get_glitch_effect(video_type, video_index)
+        # 替换最后一个标签为中间标签，再追加故障滤镜
+        final = filters[-1]
+        filters[-1] = final.rsplit('[', 1)[0] + '[vpre]'
+        filters.append(f"[vpre]{glitch_str}[vout]")
+    else:
+        glitch_name = "无"
+        final = filters[-1]
+        filters[-1] = final.rsplit('[', 1)[0] + '[vout]'
 
     video_filter = ";".join(filters)
 
@@ -154,10 +186,18 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         audio_filter = "anull"
         audio_effect = "无"
 
+    # 变速的音频同步
+    if speed_audio and speed_audio != "anull":
+        if audio_filter and audio_filter != "anull":
+            audio_filter = f"{audio_filter},{speed_audio}"
+        else:
+            audio_filter = speed_audio
+
     info = {
         "配色": scheme["name"], "遮罩": mask_style, "边框": border_style,
         "装饰": deco_style, "粒子": particle_style, "调色": preset_name,
-        "音效": audio_effect,
+        "LUT": lut_name, "变速": speed_name, "镜头": lens_name,
+        "故障": glitch_name, "音效": audio_effect,
     }
 
     return video_filter, audio_filter, info

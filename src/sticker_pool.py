@@ -12,6 +12,10 @@ VideoMixer 效果池管理
 8. 字体/文字效果轮换
 9. 音频微调随机化
 10. 滤镜/调色预设池
+11. LUT 风格化调色
+12. 变速曲线
+13. 镜头效果
+14. 故障特效
 
 每个视频完全随机，确保每个视频风格都不同。
 """
@@ -36,27 +40,33 @@ def _get_rng(video_index: int = 0, domain: str = ""):
 # ============================================================
 
 ALL_STICKER_GROUPS = {
-    "花草自然": ["611 花花草草", "38 花", "176 蜡笔树叶和花", "44 水彩花边素材"],
-    "装饰边框": ["100 蕾丝花边", "103  古董边框和装饰品", "200 可爱装饰"],
-    "中式传统": ["105 中式传统图案", "51 古风建筑"],
-    "卡通可爱": ["100 卡通小人", "101 卡通可爱耳朵", "100 手绘涂鸦风可爱分割线对话框"],
-    "食物饮品": ["105 中国各地美食", "101 饮料"],
-    "动物自然": ["100 手绘卡通可爱恐龙", "102 可爱恐龙", "102 海洋生物"],
-    "建筑场景": ["100 国外建筑", "100 名胜古迹手绘", "102 房子"],
-    "字体文字": ["102 英文字体", "11 简约字母"],
+    "flora": ["flowers_and_plants", "flowers_38", "crayon_leaves_flowers", "watercolor_floral_borders"],
+    "frames": ["lace_borders", "antique_frames", "cute_decorations",
+               "dark_decorative_patterns/dark_patterns"],
+    "chinese": ["chinese_traditional_patterns", "ancient_architecture",
+                "chinese_style_bg", "ancient_windows", "traditional_auspicious_patterns", "ancient_scenes"],
+    "cartoon": ["cartoon_characters", "cartoon_cute_ears", "doodle_dividers_bubbles",
+                "cute_animal_faces"],
+    "food": ["chinese_regional_food", "drinks", "chocolate_desserts"],
+    "animals": ["cartoon_dinosaurs", "cute_dinosaurs", "sea_creatures", "birds"],
+    "buildings": ["world_architecture", "landmarks_sketches", "houses", "carousel"],
+    "typography": ["english_typography", "minimal_letters", "dark_decorative_patterns/white_cutout_letters"],
+    "stars_dots": ["cartoon_stars_192/cartoon_stars", "cartoon_stars_83",
+                   "polka_dots/colorful", "polka_dots/monochrome"],
+    "holiday": ["halloween"],
 }
 
 TYPE_PREFERRED_GROUPS = {
-    "handwriting": ["花草自然", "装饰边框", "中式传统", "字体文字"],
-    "emotional": ["花草自然", "装饰边框", "卡通可爱", "中式传统"],
-    "health": ["花草自然", "动物自然", "食物饮品", "中式传统"],
+    "handwriting": ["flora", "frames", "chinese", "typography", "stars_dots"],
+    "emotional": ["flora", "frames", "cartoon", "chinese", "stars_dots", "holiday"],
+    "health": ["flora", "animals", "food", "chinese", "buildings"],
 }
 
 
 def get_rotated_stickers(assets_dir: Path, count: int, video_type: str = "general",
                          video_index: int = 0) -> list:
     """获取轮换后的贴纸列表"""
-    lib_dir = assets_dir / "19000 免抠贴纸素材"
+    lib_dir = assets_dir / "stickers"
     if not lib_dir.exists():
         return []
 
@@ -94,19 +104,24 @@ def get_rotated_stickers(assets_dir: Path, count: int, video_type: str = "genera
 
 SPARKLE_STYLE_DIRS = {
     "gold": ["stars", "glitter", "crowns", "generated", "generated_v2",
-             "generated_v3", "generated_v6", "generated_v8"],
+             "generated_v3", "generated_v6", "generated_v8",
+             "light_effects_alpha", "bokeh_converted"],
     "pink": ["hearts", "flowers", "butterflies", "ribbons", "generated",
-             "generated_v4", "generated_v7", "generated_v9"],
+             "generated_v4", "generated_v7", "generated_v9",
+             "light_effects_round"],
     "warm": ["light_effects", "extra", "glitter", "generated_v2", "stars",
-             "generated_v3", "generated_v5", "generated_v6", "generated_v8"],
+             "generated_v3", "generated_v5", "generated_v6", "generated_v8",
+             "light_effects_alpha", "bokeh_converted"],
     "cool": ["generated", "generated_v2", "light_effects", "pngall",
-             "generated_v3", "generated_v8", "generated_v10"],
+             "generated_v3", "generated_v8", "generated_v10",
+             "light_effects_alpha", "bokeh_converted"],
     "mixed": ["stars", "flowers", "hearts", "butterflies", "glitter",
               "light_effects", "crowns", "ribbons", "extra", "misc",
               "generated", "generated_v2", "pngmart", "pngall",
               "generated_v3", "generated_v4", "generated_v5",
               "generated_v6", "generated_v7", "generated_v8",
-              "generated_v9", "generated_v10"],
+              "generated_v9", "generated_v10",
+              "light_effects_alpha", "light_effects_round", "bokeh_converted"],
 }
 
 
@@ -123,7 +138,7 @@ def get_sparkle_overlays(assets_dir: Path, count: int = 5, style: str = "mixed")
     for subdir_name in preferred_dirs:
         subdir = sparkle_dir / subdir_name
         if subdir.exists():
-            all_sparkles.extend(subdir.glob("*.png"))
+            all_sparkles.extend(subdir.rglob("*.png"))
 
     if not all_sparkles:
         return []
@@ -694,6 +709,200 @@ def get_color_preset(video_type: str = "general", video_index: int = 0) -> tuple
 
 
 # ============================================================
+# 11. LUT 风格化调色
+# ============================================================
+
+LUT_PRESETS = {
+    "胶片青橙": (
+        "curves=r='0/0 0.25/0.20 0.5/0.55 0.75/0.85 1/1'"
+        ":g='0/0 0.25/0.22 0.5/0.50 0.75/0.78 1/0.95'"
+        ":b='0/0.05 0.25/0.18 0.5/0.40 0.75/0.65 1/0.85',"
+        "colorbalance=rs=0.12:gs=-0.05:bs=-0.15:rm=0.08:gm=-0.02:bm=-0.08"
+    ),
+    "复古柯达": (
+        "curves=r='0/0.02 0.25/0.28 0.5/0.58 0.75/0.82 1/0.95'"
+        ":g='0/0.01 0.25/0.22 0.5/0.48 0.75/0.75 1/0.92'"
+        ":b='0/0 0.25/0.15 0.5/0.38 0.75/0.62 1/0.82',"
+        "eq=brightness=0.04:contrast=1.08:saturation=0.85,"
+        "colorbalance=rs=0.06:gs=0.02:bs=-0.08"
+    ),
+    "黑金电影": (
+        "curves=m='0/0 0.15/0.05 0.5/0.45 0.85/0.90 1/1',"
+        "colorbalance=rs=0.03:gs=-0.02:bs=-0.08:rh=0.10:gh=0.06:bh=-0.05,"
+        "eq=brightness=-0.03:contrast=1.18:saturation=0.75"
+    ),
+    "日落暖阳": (
+        "colorbalance=rs=0.15:gs=0.05:bs=-0.12:rm=0.10:gm=0.03:bm=-0.08,"
+        "curves=r='0/0 0.5/0.58 1/1':g='0/0 0.5/0.50 1/0.95',"
+        "eq=brightness=0.05:saturation=1.15"
+    ),
+    "冰蓝清冷": (
+        "colorbalance=rs=-0.10:gs=0.02:bs=0.15:rm=-0.06:gm=0.01:bm=0.10,"
+        "curves=b='0/0.05 0.5/0.58 1/1',"
+        "eq=brightness=0.02:contrast=1.05:saturation=0.90"
+    ),
+    "赛博霓虹": (
+        "colorbalance=rs=0.08:gs=-0.10:bs=0.15:rm=-0.05:gm=0.02:bm=0.12,"
+        "hue=s=1.3,"
+        "eq=brightness=-0.02:contrast=1.20:saturation=1.35"
+    ),
+    "褪色记忆": (
+        "curves=m='0/0.08 0.5/0.52 1/0.92',"
+        "colorbalance=rs=0.05:gs=0.03:bs=0.02,"
+        "eq=brightness=0.06:contrast=0.90:saturation=0.65"
+    ),
+    "森林绿调": (
+        "colorbalance=rs=-0.08:gs=0.12:bs=-0.05:rm=-0.04:gm=0.08:bm=-0.03,"
+        "curves=g='0/0 0.5/0.55 1/1',"
+        "eq=brightness=0.02:saturation=1.10"
+    ),
+    "紫罗兰夜": (
+        "colorbalance=rs=0.08:gs=-0.08:bs=0.18:rm=0.05:gm=-0.05:bm=0.12,"
+        "curves=b='0/0.05 0.5/0.55 1/1':r='0/0 0.5/0.48 1/0.95',"
+        "eq=brightness=-0.03:contrast=1.10:saturation=1.05"
+    ),
+    "沙漠暖棕": (
+        "colorbalance=rs=0.10:gs=0.05:bs=-0.10:rm=0.06:gm=0.02:bm=-0.06,"
+        "curves=r='0/0 0.5/0.55 1/1':g='0/0 0.5/0.48 1/0.92',"
+        "eq=brightness=0.03:contrast=1.06:saturation=0.95"
+    ),
+}
+
+TYPE_PREFERRED_LUTS = {
+    "handwriting": ["黑金电影", "复古柯达", "胶片青橙", "沙漠暖棕", "日落暖阳"],
+    "emotional": ["褪色记忆", "紫罗兰夜", "日落暖阳", "冰蓝清冷", "胶片青橙"],
+    "health": ["森林绿调", "日落暖阳", "复古柯达", "沙漠暖棕", "褪色记忆"],
+}
+
+
+def get_lut_filters(video_type: str = "general", video_index: int = 0) -> tuple:
+    """获取 LUT 风格化调色滤镜"""
+    rng = _get_rng(video_index, "lut")
+    preferred = TYPE_PREFERRED_LUTS.get(video_type, list(LUT_PRESETS.keys()))
+    name = rng.choice(preferred)
+    return LUT_PRESETS[name], name
+
+
+# ============================================================
+# 12. 变速曲线
+# ============================================================
+
+SPEED_RAMPS = {
+    "突击加速": (
+        "setpts='if(lt(T,2),PTS,if(lt(T,4),PTS*0.7,PTS*0.85))'",
+        "atempo=1.3,atempo=1.0",
+    ),
+    "慢动作揭示": (
+        "setpts='if(lt(T,3),PTS*1.3,PTS)'",
+        "atempo=0.77",
+    ),
+    "心跳节奏": (
+        "setpts='PTS*(0.9+0.1*sin(T*3.14))'",
+        "atempo=1.0",
+    ),
+    "渐进加速": (
+        "setpts='PTS*(1.2-0.2*T/30)'",
+        "atempo=1.0",
+    ),
+    "冲击波": (
+        "setpts='if(lt(T,5),PTS,if(lt(T,6),PTS*0.5,PTS))'",
+        "atempo=1.0",
+    ),
+    "呼吸感": (
+        "setpts='PTS*(1.0+0.05*sin(T*1.57))'",
+        "atempo=1.0",
+    ),
+    "无变速": (
+        "null",
+        "anull",
+    ),
+}
+
+
+def get_speed_ramp(video_index: int = 0) -> tuple:
+    """获取变速曲线，返回 (video_setpts, audio_atempo, name)"""
+    rng = _get_rng(video_index, "speed")
+    # "无变速" 占 40% 概率
+    names = list(SPEED_RAMPS.keys())
+    weights = [10 if n != "无变速" else 40 for n in names]
+    name = rng.choices(names, weights=weights, k=1)[0]
+    video_f, audio_f = SPEED_RAMPS[name]
+    return video_f, audio_f, name
+
+
+# ============================================================
+# 13. 镜头效果
+# ============================================================
+
+LENS_EFFECTS = {
+    "柔和暗角": "vignette=PI/5",
+    "强烈暗角": "vignette=PI/3.5:1.2",
+    "色散微弱": "rgbashift=rh=-2:bh=2:rv=1:bv=-1",
+    "色散中等": "rgbashift=rh=-4:bh=4:rv=2:bv=-2",
+    "桶形畸变": "lenscorrection=k1=0.15:k2=0.02",
+    "广角夸张": "lenscorrection=k1=-0.2:k2=0.05",
+    "柔焦光晕": "gblur=sigma=0.8",
+    "锐利聚焦": "unsharp=5:5:1.2:5:5:0.0",
+    "无镜头效果": "null",
+}
+
+TYPE_PREFERRED_LENS = {
+    "handwriting": ["柔和暗角", "锐利聚焦", "色散微弱", "无镜头效果"],
+    "emotional": ["柔和暗角", "柔焦光晕", "色散微弱", "强烈暗角", "无镜头效果"],
+    "health": ["柔和暗角", "柔焦光晕", "锐利聚焦", "无镜头效果"],
+}
+
+
+def get_lens_effect(video_type: str = "general", video_index: int = 0) -> tuple:
+    """获取镜头效果滤镜"""
+    rng = _get_rng(video_index, "lens")
+    preferred = TYPE_PREFERRED_LENS.get(video_type, list(LENS_EFFECTS.keys()))
+    # "无镜头效果" 占 30% 概率
+    weights = [10 if n != "无镜头效果" else 30 for n in preferred]
+    name = rng.choices(preferred, weights=weights, k=1)[0]
+    return LENS_EFFECTS[name], name
+
+
+# ============================================================
+# 14. 故障特效
+# ============================================================
+
+GLITCH_EFFECTS = {
+    "RGB偏移轻微": "rgbashift=rh=3:bh=-3:rv=-2:bv=2:edge=smear",
+    "RGB偏移强烈": "rgbashift=rh=8:bh=-8:rv=-5:bv=5:edge=smear",
+    "信号噪点": "noise=alls=20:allf=t",
+    "VHS复古": (
+        "noise=alls=15:allf=t,"
+        "eq=brightness=0.03:contrast=1.05:saturation=0.8,"
+        "rgbashift=rh=3:bh=-2"
+    ),
+    "扫描线": (
+        "drawbox=y=ih*mod(t*50\\,1):w=iw:h=3:c=black@0.3:t=fill,"
+        "drawbox=y=ih*mod(t*50+0.5\\,1):w=iw:h=2:c=white@0.15:t=fill"
+    ),
+    "色彩跳变": "hue=H=10*sin(t*8):s=1+0.2*sin(t*5)",
+    "抖动偏移": "crop=iw-8:ih-8:4+2*sin(t*12):4+2*cos(t*9),scale=iw+8:ih+8",
+    "无故障": "null",
+}
+
+TYPE_PREFERRED_GLITCH = {
+    "handwriting": ["信号噪点", "扫描线", "RGB偏移轻微", "无故障"],
+    "emotional": ["色彩跳变", "VHS复古", "RGB偏移轻微", "无故障"],
+    "health": ["信号噪点", "RGB偏移轻微", "无故障"],
+}
+
+
+def get_glitch_effect(video_type: str = "general", video_index: int = 0) -> tuple:
+    """获取故障特效滤镜"""
+    rng = _get_rng(video_index, "glitch")
+    preferred = TYPE_PREFERRED_GLITCH.get(video_type, list(GLITCH_EFFECTS.keys()))
+    # "无故障" 占 50% 概率
+    weights = [10 if n != "无故障" else 50 for n in preferred]
+    name = rng.choices(preferred, weights=weights, k=1)[0]
+    return GLITCH_EFFECTS[name], name
+
+
+# ============================================================
 # 信息展示
 # ============================================================
 
@@ -703,8 +912,9 @@ def get_sticker_pool_info() -> str:
     sparkle_dir = Path(__file__).parent.parent / "assets" / "sparkles" / "png"
     sparkle_count = len(list(sparkle_dir.rglob("*.png"))) if sparkle_dir.exists() else 0
     return (
-        f"效果池: 每个视频独立随机\n"
+        f"效果池: 每个视频独立随机 (14维)\n"
         f"  配色方案: {len(COLOR_SCHEMES)}套 | 遮罩: 5种 | 粒子: 6种\n"
         f"  装饰: 5种 | 边框: 6种 | 调色: {len(COLOR_PRESETS)}种\n"
+        f"  LUT: {len(LUT_PRESETS)}种 | 变速: {len(SPEED_RAMPS)}种 | 镜头: {len(LENS_EFFECTS)}种 | 故障: {len(GLITCH_EFFECTS)}种\n"
         f"  闪光/特效素材: {sparkle_count}个"
     )

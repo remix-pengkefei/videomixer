@@ -40,7 +40,7 @@ STICKER_FOLDERS = [
 def get_stickers(assets_dir: Path, count: int) -> List[str]:
     """获取贴纸"""
     stickers = []
-    lib_dir = assets_dir / "19000 免抠贴纸素材"
+    lib_dir = assets_dir / "stickers"
 
     if lib_dir.exists():
         for folder in STICKER_FOLDERS:

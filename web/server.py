@@ -324,7 +324,7 @@ async def get_assets_overview():
     assets_root = PROJECT_ROOT / "assets"
 
     # Sticker breakdown by category
-    sticker_dir = assets_root / "19000 免抠贴纸素材"
+    sticker_dir = assets_root / "stickers"
     sticker_categories = {}
     total_stickers = 0
     if sticker_dir.is_dir():
@@ -396,7 +396,7 @@ async def env_check():
 
     # Assets
     assets_root = PROJECT_ROOT / "assets"
-    sticker_dir = assets_root / "19000 免抠贴纸素材"
+    sticker_dir = assets_root / "stickers"
     sticker_count = sum(1 for _ in sticker_dir.rglob("*.png")) if sticker_dir.is_dir() else 0
     sparkle_dir = assets_root / "sparkles" / "png"
     sparkle_count = sum(1 for _ in sparkle_dir.rglob("*.png")) if sparkle_dir.is_dir() else 0
