@@ -360,7 +360,7 @@ def get_particle_filters(w: int, h: int, top_h: int, bottom_h: int,
             speed = rng.uniform(0.8, 2.5)
             particles.append(
                 f"drawbox=x={px}:y={py}:w={size}:h={size}:"
-                f"c={color}@'0.5+0.4*sin(t*{speed:.1f}+{phase:.2f})':t=fill"
+                f"c={color}@0.8:t=fill:enable='gt(sin(t*{speed:.1f}+{phase:.2f}),0)'"
             )
 
     elif style == "firefly":

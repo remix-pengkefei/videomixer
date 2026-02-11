@@ -17,16 +17,32 @@ from src.sticker_pool import (
 
 
 def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
-                 video_index: int = 0, video_type: str = "health") -> tuple:
+                 video_index: int = 0, video_type: str = "health",
+                 config: dict = None) -> tuple:
     """构建滤镜"""
+    if config is None:
+        config = {}
     filters = []
 
-    scheme = get_color_scheme(video_type, video_index)
+    color_scheme_name = config.get('color_scheme', 'random')
+    if color_scheme_name and color_scheme_name != 'random':
+        from src.sticker_pool import COLOR_SCHEMES
+        if color_scheme_name in COLOR_SCHEMES:
+            scheme = COLOR_SCHEMES[color_scheme_name].copy()
+            scheme["name"] = color_scheme_name
+        else:
+            scheme = get_color_scheme(video_type, video_index)
+    else:
+        scheme = get_color_scheme(video_type, video_index)
     mask_color = scheme["mask"]
     colors = scheme["colors"]
     particle_colors = scheme["particle_colors"]
 
-    color_preset, preset_name = get_color_preset(video_type, video_index)
+    if config.get('enable_color_preset', True):
+        color_preset, preset_name = get_color_preset(video_type, video_index)
+    else:
+        color_preset = "null"
+        preset_name = "无"
 
     top_h = 220
     bottom_h = 240
@@ -46,16 +62,24 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
     filters.append(f"[v1]{bottom_mask}[v2]")
 
     # 3. 边框
-    border_str, border_style = get_border_filters(w, h, colors, video_index)
-    if border_str:
-        filters.append(f"[v2]{border_str}[v3]")
+    if config.get('enable_border', True):
+        border_str, border_style = get_border_filters(w, h, colors, video_index)
+        if border_str:
+            filters.append(f"[v2]{border_str}[v3]")
+        else:
+            filters.append(f"[v2]null[v3]")
     else:
+        border_style = "无"
         filters.append(f"[v2]null[v3]")
 
     # 4. 装饰
-    deco_str, deco_style = get_decoration_filters(
-        w, h, top_h, bottom_h, colors, video_index)
-    filters.append(f"[v3]{deco_str}[v4]")
+    if config.get('enable_decorations', True):
+        deco_str, deco_style = get_decoration_filters(
+            w, h, top_h, bottom_h, colors, video_index)
+        filters.append(f"[v3]{deco_str}[v4]")
+    else:
+        deco_style = "无"
+        filters.append(f"[v3]null[v4]")
 
     # 5. 光晕
     glow = [
@@ -65,9 +89,13 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
     filters.append(f"[v4]{','.join(glow)}[v5]")
 
     # 6. 粒子
-    particle_str, particle_style = get_particle_filters(
-        w, h, top_h, bottom_h, particle_colors, 45, video_index)
-    filters.append(f"[v5]{particle_str}[v6]")
+    if config.get('enable_particles', True):
+        particle_str, particle_style = get_particle_filters(
+            w, h, top_h, bottom_h, particle_colors, 45, video_index)
+        filters.append(f"[v5]{particle_str}[v6]")
+    else:
+        particle_style = "无"
+        filters.append(f"[v5]null[v6]")
 
     # 7. 贴纸
     current = "[v6]"
@@ -123,7 +151,11 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
     filters[-1] = final.rsplit('[', 1)[0] + '[vout]'
 
     video_filter = ";".join(filters)
-    audio_filter, audio_effect = get_audio_filters(video_index)
+    if config.get('enable_audio_fx', True):
+        audio_filter, audio_effect = get_audio_filters(video_index)
+    else:
+        audio_filter = "anull"
+        audio_effect = "无"
 
     info = {
         "配色": scheme["name"], "遮罩": mask_style, "边框": border_style,
@@ -134,7 +166,7 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
     return video_filter, audio_filter, info
 
 
-def process(input_path: str, output_path: str, video_index: int = 0) -> bool:
+def process(input_path: str, output_path: str, video_index: int = 0, config: dict = None) -> bool:
     if not os.path.exists(input_path):
         print(f"文件不存在: {input_path}")
         return False
@@ -151,13 +183,20 @@ def process(input_path: str, output_path: str, video_index: int = 0) -> bool:
     print(f"输入: {Path(input_path).name}")
     print(f"时长: {duration:.1f}秒")
 
+    if config is None:
+        config = {}
+    sticker_count = config.get('sticker_count', 20)
+    sparkle_count = config.get('sparkle_count', 5)
+    sparkle_style = config.get('sparkle_style', 'warm')
+
     assets_dir = Path(__file__).parent.parent / "assets"
-    stickers = get_rotated_stickers(assets_dir, 20, "health", video_index)
-    sparkles = get_sparkle_overlays(assets_dir, 5, "warm")
+    stickers = get_rotated_stickers(assets_dir, sticker_count, "health", video_index)
+    sparkles = get_sparkle_overlays(assets_dir, sparkle_count, sparkle_style)
 
     w, h = 720, 1280
     video_filter, audio_filter, info = build_filter(
-        w, h, stickers, sparkles, video_index, "health")
+        w, h, stickers, sparkles, video_index, "health",
+        config=config)
 
     print(f"贴纸: {len(stickers)}个 | 闪光: {len(sparkles)}个")
     for k, v in info.items():
@@ -182,10 +221,22 @@ def process(input_path: str, output_path: str, video_index: int = 0) -> bool:
     ])
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        last_lines = []
+        for line in proc.stderr:
+            line = line.rstrip()
+            if line:
+                print(line, flush=True)
+                last_lines.append(line)
+                if len(last_lines) > 20:
+                    last_lines.pop(0)
+
+        proc.wait(timeout=1800)
 
         if proc.returncode != 0:
-            print(f"错误: {proc.stderr[-500:]}")
+            print(f"错误: {''.join(last_lines[-5:])}")
             return False
 
         out_size = os.path.getsize(output_path) / 1024 / 1024
