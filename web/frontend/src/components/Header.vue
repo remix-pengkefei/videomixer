@@ -25,6 +25,13 @@
         </button>
         <button
           class="header-tab"
+          :class="{ active: currentTab === 'data' }"
+          @click="$emit('changeTab', 'data')"
+        >
+          数据
+        </button>
+        <button
+          class="header-tab"
           :class="{ active: currentTab === 'history' }"
           @click="$emit('changeTab', 'history')"
         >

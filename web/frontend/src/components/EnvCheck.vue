@@ -1,70 +1,63 @@
 <template>
-  <div class="env-check">
-    <div class="env-check-card">
-      <div class="env-check-header">
-        <h1 class="env-check-title">VideoMixer</h1>
-        <p class="env-check-subtitle">检查运行环境</p>
+  <div class="env-splash">
+    <div class="env-splash-inner">
+      <!-- Brand -->
+      <div class="env-brand">
+        <div class="env-logo">
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+            <rect width="56" height="56" rx="14" fill="url(#lg)"/>
+            <path d="M20 16l18 12-18 12V16z" fill="#fff" opacity="0.95"/>
+            <defs><linearGradient id="lg" x1="0" y1="0" x2="56" y2="56"><stop stop-color="#18181b"/><stop offset="1" stop-color="#3f3f46"/></linearGradient></defs>
+          </svg>
+        </div>
+        <h1 class="env-title">VideoMixer</h1>
+        <p class="env-version">v1.0</p>
       </div>
 
-      <div class="env-check-items">
+      <!-- Check items -->
+      <div class="env-checks">
         <div
           v-for="item in checkItems"
           :key="item.key"
-          class="env-check-item"
+          class="env-row"
+          :class="item.status"
         >
-          <span class="env-check-icon" :class="item.status">
+          <span class="env-row-icon">
             <span v-if="item.status === 'checking'" class="spinner"></span>
-            <svg v-else-if="item.status === 'ok'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 8.5L6.5 12L13 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <svg v-else-if="item.status === 'ok'" width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+              <path d="M5.5 9.5L7.5 12L12.5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            <svg v-else-if="item.status === 'missing'" width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <svg v-else-if="item.status === 'missing'" width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+              <path d="M6.5 6.5l5 5M11.5 6.5l-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
             <span v-else class="spinner" style="opacity:0.3"></span>
           </span>
-          <div class="env-check-label">
-            <span class="env-check-name">{{ item.name }}</span>
-            <span class="env-check-detail">{{ item.detail }}</span>
-          </div>
-        </div>
-
-        <div v-if="installing" class="env-install-section">
-          <div class="env-install-label">正在安装 ffmpeg...</div>
-          <div ref="terminalRef" class="env-install-output">
-            <div
-              v-for="(line, i) in installOutput"
-              :key="i"
-              class="env-install-line"
-            >{{ line }}</div>
-          </div>
+          <span class="env-row-name">{{ item.name }}</span>
+          <span class="env-row-desc">{{ item.desc }}</span>
+          <span class="env-row-detail">{{ item.detail }}</span>
         </div>
       </div>
 
-      <div class="env-check-footer">
-        <template v-if="allReady">
-          <p class="env-check-ready">环境就绪</p>
-          <button class="btn-continue" @click="$emit('ready')">
-            继续
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </template>
-        <template v-else-if="hasMissing && !installing">
-          <button
-            v-if="ffmpegMissing"
-            class="btn-install"
-            @click="installFfmpeg"
-          >
-            安装 ffmpeg
-          </button>
-          <p v-if="assetsMissing && !ffmpegMissing" class="env-check-error">
-            缺少素材文件，请检查 assets 目录
-          </p>
-        </template>
-        <template v-else-if="!hasMissing && !allReady">
-          <p class="env-check-status">正在检查...</p>
-        </template>
+      <!-- Install output -->
+      <div v-if="installing" class="env-install-section">
+        <div class="env-install-label">正在安装 ffmpeg...</div>
+        <div ref="terminalRef" class="env-install-output">
+          <div v-for="(line, i) in installOutput" :key="i" class="env-install-line">{{ line }}</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="env-actions">
+        <button v-if="ffmpegMissing && !installing" class="env-btn-install" @click="installFfmpeg">安装 ffmpeg</button>
+        <p v-if="assetsMissing && !ffmpegMissing && !installing" class="env-error-text">缺少素材文件，请检查 assets 目录</p>
+        <button class="env-btn-go" :disabled="!allReady" @click="$emit('ready')">
+          进入工作台
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7 4l6 5-6 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
@@ -76,10 +69,10 @@ import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 const emit = defineEmits(['ready'])
 
 const checks = reactive({
-  ffmpeg:   { status: 'pending', name: 'ffmpeg',   detail: '' },
-  ffprobe:  { status: 'pending', name: 'ffprobe',  detail: '' },
-  stickers: { status: 'pending', name: '贴纸素材', detail: '' },
-  sparkles: { status: 'pending', name: '闪光素材', detail: '' },
+  ffmpeg:   { status: 'pending', name: 'ffmpeg',   desc: '视频编码引擎', detail: '' },
+  ffprobe:  { status: 'pending', name: 'ffprobe',  desc: '视频信息探测', detail: '' },
+  stickers: { status: 'pending', name: '贴纸素材', desc: '随机装饰贴纸', detail: '' },
+  sparkles: { status: 'pending', name: '闪光素材', desc: '闪光粒子效果', detail: '' },
 })
 
 const installing = ref(false)
@@ -90,12 +83,14 @@ const checkItems = computed(() =>
   Object.entries(checks).map(([key, val]) => ({ key, ...val }))
 )
 
+const allChecks = computed(() => Object.values(checks))
+
 const allReady = computed(() =>
-  Object.values(checks).every(c => c.status === 'ok')
+  allChecks.value.every(c => c.status === 'ok')
 )
 
 const hasMissing = computed(() =>
-  Object.values(checks).some(c => c.status === 'missing')
+  allChecks.value.some(c => c.status === 'missing')
 )
 
 const ffmpegMissing = computed(() =>
@@ -114,7 +109,14 @@ watch(installOutput, async () => {
 }, { deep: true })
 
 async function runCheck() {
-  for (const c of Object.values(checks)) c.status = 'checking'
+  for (const c of Object.values(checks)) {
+    c.status = 'checking'
+    c.detail = ''
+  }
+  checks.ffmpeg.detail = '检测中...'
+  checks.ffprobe.detail = '检测中...'
+  checks.stickers.detail = '扫描目录...'
+  checks.sparkles.detail = '扫描目录...'
 
   try {
     const res = await fetch('/api/env-check')

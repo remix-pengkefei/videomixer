@@ -110,6 +110,12 @@
           <!-- ===== Tab: Asset Library ===== -->
           <AssetLibrary v-else-if="currentTab === 'assets'" />
 
+          <!-- ===== Tab: Data Tracking ===== -->
+          <DataPanel
+            v-else-if="currentTab === 'data'"
+            :platform="activePlatform"
+          />
+
           <!-- ===== Tab: History ===== -->
           <HistoryPanel v-else-if="currentTab === 'history'" />
         </main>
@@ -156,6 +162,7 @@ import ProgressPanel from './components/ProgressPanel.vue'
 import EnvCheck from './components/EnvCheck.vue'
 import AssetLibrary from './components/AssetLibrary.vue'
 import StrategyConfig from './components/StrategyConfig.vue'
+import DataPanel from './components/DataPanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
 
 const phase = ref('env-check')
@@ -391,6 +398,7 @@ function connectWs(id) {
       failed.value = msg.failed
       elapsed.value = msg.elapsed
       currentFile.value = ''
+      registerVideoStats()
     } else if (msg.type === 'cancelled') {
       taskStatus.value = 'cancelled'
       currentFile.value = ''
@@ -407,6 +415,27 @@ function connectWs(id) {
     if (taskStatus.value === 'running') {
       setTimeout(() => connectWs(id), 2000)
     }
+  }
+}
+
+async function registerVideoStats() {
+  const now = new Date().toISOString()
+  const videos = fileResults.value
+    .filter(r => r.status === 'done')
+    .map(r => ({
+      id: `${taskId.value}_${r.filename}`,
+      task_id: taskId.value,
+      filename: r.filename,
+      platform: activePlatform.value,
+      created_at: now,
+      stats: {},
+    }))
+  if (videos.length > 0) {
+    await fetch('/api/video-stats/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videos }),
+    }).catch(() => {})
   }
 }
 

@@ -519,6 +519,54 @@ async def clear_history():
     return {"ok": True}
 
 
+STATS_FILE = DATA_DIR / "video_stats.json"
+
+def _load_stats():
+    if STATS_FILE.exists():
+        return json.loads(STATS_FILE.read_text("utf-8"))
+    return {"videos": []}
+
+def _save_stats(data):
+    STATS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
+
+
+@app.get("/api/video-stats")
+async def get_video_stats():
+    """Read all video stats."""
+    return _load_stats()
+
+
+class VideoStatUpdate(BaseModel):
+    id: str
+    stats: dict
+
+@app.put("/api/video-stats")
+async def update_video_stat(body: VideoStatUpdate):
+    """Update stats for a single video entry."""
+    data = _load_stats()
+    for v in data["videos"]:
+        if v["id"] == body.id:
+            v["stats"].update(body.stats)
+            _save_stats(data)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail="Video not found")
+
+
+class VideoStatCreate(BaseModel):
+    videos: list
+
+@app.post("/api/video-stats/batch")
+async def batch_create_video_stats(body: VideoStatCreate):
+    """Add new video entries (from completed task) without duplicates."""
+    data = _load_stats()
+    existing_ids = {v["id"] for v in data["videos"]}
+    for v in body.videos:
+        if v["id"] not in existing_ids:
+            data["videos"].append(v)
+    _save_stats(data)
+    return {"ok": True}
+
+
 class OpenFolderBody(BaseModel):
     path: str
 
