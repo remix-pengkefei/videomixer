@@ -26,7 +26,9 @@ def get_filler_videos(count: int = 2) -> list:
     if not FILLER_DIR.exists():
         FILLER_DIR.mkdir(parents=True, exist_ok=True)
 
-    fillers = list(FILLER_DIR.glob("*.mp4")) + list(FILLER_DIR.glob("*.mkv"))
+    fillers = []
+    for ext in ("*.mp4", "*.mkv", "*.webm", "*.mov"):
+        fillers.extend(FILLER_DIR.rglob(ext))
     if not fillers:
         return []
 
@@ -72,7 +74,7 @@ def generate_synthetic_filler(w: int, h: int, duration: float, index: int) -> st
     cmd.extend([
         '-c:a', 'aac', '-shortest',
         out_path
-    ]
+    ])
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:

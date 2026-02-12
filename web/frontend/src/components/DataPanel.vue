@@ -285,10 +285,12 @@ const PLATFORM_COLUMNS = {
 const columns = computed(() => PLATFORM_COLUMNS[props.platform] || PLATFORM_COLUMNS.weixin)
 
 const filteredVideos = computed(() =>
-  videos.value.filter(v =>
-    v.platform === props.platform &&
-    (activeCategory.value === 'all' || v.strategy === activeCategory.value)
-  )
+  videos.value
+    .filter(v =>
+      v.platform === props.platform &&
+      (activeCategory.value === 'all' || v.strategy === activeCategory.value)
+    )
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
 )
 
 function formatDate(iso) {

@@ -28,7 +28,7 @@
           :class="{ active: currentTab === 'data' }"
           @click="$emit('changeTab', 'data')"
         >
-          播放数据
+          视频管理
         </button>
         <button
           class="header-tab"

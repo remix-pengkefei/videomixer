@@ -18,36 +18,28 @@
 
         <main class="main-content">
           <!-- ===== Tab: Processing ===== -->
-          <template v-if="currentTab === 'processing'">
-
-            <!-- === Active Task View === -->
-            <template v-if="taskId">
-              <ProgressPanel
-                :status="taskStatus"
-                :completed="completed"
-                :failed="failed"
-                :total="total"
-                :current-file="currentFile"
-                :file-results="fileResults"
-                :all-files="allFiles"
-                :elapsed="elapsed"
-                :log-lines="logLines"
-                :task-id="taskId"
-                @cancel="cancelTask"
-                @download-all="downloadAll"
-                @reset="resetTask"
-              />
-            </template>
-
-            <!-- === Setup View (no active task) === -->
-            <template v-else>
-              <!-- Upload Area -->
+          <div v-show="currentTab === 'processing'" class="tab-panel">
+            <ProgressPanel
+              v-if="taskId"
+              :status="taskStatus"
+              :completed="completed"
+              :failed="failed"
+              :total="total"
+              :current-file="currentFile"
+              :file-results="fileResults"
+              :all-files="allFiles"
+              :elapsed="elapsed"
+              :log-lines="logLines"
+              :task-id="taskId"
+              @cancel="cancelTask"
+              @download-all="downloadAll"
+              @reset="resetTask"
+            />
+            <div v-else>
               <FileUploader
                 :session-id="sessionId"
                 @categories-changed="onCategoriesChanged"
               />
-
-              <!-- Video List (after upload) -->
               <VideoList
                 v-if="categories.length > 0"
                 :categories="categories"
@@ -58,28 +50,32 @@
                 @update-outputs="globalOutputs = $event"
                 @start="startTask"
               />
-            </template>
-          </template>
+            </div>
+          </div>
 
           <!-- ===== Tab: Strategies ===== -->
-          <StrategyConfig
-            v-else-if="currentTab === 'strategies'"
-            :strategies="strategies"
-            :global-config="globalConfig"
-            @saved="onGlobalConfigSaved"
-          />
+          <div v-show="currentTab === 'strategies'" class="tab-panel">
+            <StrategyConfig
+              :strategies="strategies"
+              :global-config="globalConfig"
+              @saved="onGlobalConfigSaved"
+            />
+          </div>
 
           <!-- ===== Tab: Asset Library ===== -->
-          <AssetLibrary v-else-if="currentTab === 'assets'" />
+          <div v-show="currentTab === 'assets'" class="tab-panel">
+            <AssetLibrary />
+          </div>
 
           <!-- ===== Tab: Data Tracking ===== -->
-          <DataPanel
-            v-else-if="currentTab === 'data'"
-            :platform="activePlatform"
-          />
+          <div v-show="currentTab === 'data'" class="tab-panel">
+            <DataPanel :platform="activePlatform" />
+          </div>
 
           <!-- ===== Tab: History ===== -->
-          <HistoryPanel v-else-if="currentTab === 'history'" />
+          <div v-show="currentTab === 'history'" class="tab-panel">
+            <HistoryPanel />
+          </div>
         </main>
       </div>
 

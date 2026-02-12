@@ -76,6 +76,14 @@ button { white-space: nowrap; }
   overflow-y: auto;
 }
 
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
 /* ========== Sidebar ========== */
 
 .sidebar {
