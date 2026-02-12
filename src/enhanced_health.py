@@ -16,7 +16,7 @@ from src.sticker_pool import (
     get_lens_effect, get_glitch_effect,
     STRATEGIES, generate_video_id, detect_content_zones,
     generate_sticker_positions, generate_sparkle_positions,
-    get_anti_detect_filters, get_encoder_args,
+    get_anti_detect_filters, get_encoder_args, get_base_dir,
 )
 
 
@@ -263,7 +263,7 @@ def process(input_path: str, output_path: str, video_index: int = 0,
         print("  正在分析视频内容区域...")
         content_zones = detect_content_zones(input_path)
 
-    assets_dir = Path(__file__).parent.parent / "assets"
+    assets_dir = get_base_dir() / "assets"
     stickers = get_rotated_stickers(assets_dir, sticker_count, "health", video_index)
     sparkles = get_sparkle_overlays(assets_dir, sparkle_count, sparkle_style)
 

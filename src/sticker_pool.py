@@ -25,8 +25,17 @@ import json as _json
 import os
 import random
 import hashlib
+import sys
 from datetime import datetime
 from pathlib import Path
+
+
+def get_base_dir() -> Path:
+    """获取项目根目录。支持 PyInstaller 打包模式。"""
+    if getattr(sys, 'frozen', False):
+        # PyInstaller: executable is in bin/, base is parent
+        return Path(sys.executable).parent.parent
+    return Path(__file__).parent.parent
 
 # ============================================================
 # 随机生成器
@@ -911,7 +920,7 @@ def get_glitch_effect(video_type: str = "general", video_index: int = 0) -> tupl
 def get_sticker_pool_info() -> str:
     """返回当前效果池状态信息"""
     # 统计闪光素材数量
-    sparkle_dir = Path(__file__).parent.parent / "assets" / "sparkles" / "png"
+    sparkle_dir = get_base_dir() / "assets" / "sparkles" / "png"
     sparkle_count = len(list(sparkle_dir.rglob("*.png"))) if sparkle_dir.exists() else 0
     return (
         f"效果池: 每个视频独立随机 (14维)\n"
@@ -926,15 +935,23 @@ def get_sticker_pool_info() -> str:
 # 15. Video ID System (支持 10万+/天)
 # ============================================================
 
-_VIDEO_ID_COUNTER_FILE = Path(__file__).parent.parent / "data" / "video_id_counter.json"
+_VIDEO_ID_COUNTER_FILE = None  # lazy init for frozen mode
+
+
+def _get_counter_file() -> Path:
+    global _VIDEO_ID_COUNTER_FILE
+    if _VIDEO_ID_COUNTER_FILE is None:
+        _VIDEO_ID_COUNTER_FILE = get_base_dir() / "data" / "video_id_counter.json"
+    return _VIDEO_ID_COUNTER_FILE
 
 
 def _load_and_increment_counter(key: str) -> int:
     """从磁盘加载计数器，原子递增后写回。使用文件锁保证并发安全。"""
-    _VIDEO_ID_COUNTER_FILE.parent.mkdir(parents=True, exist_ok=True)
+    counter_file = _get_counter_file()
+    counter_file.parent.mkdir(parents=True, exist_ok=True)
 
     # 打开文件（不存在则创建）
-    fd = os.open(str(_VIDEO_ID_COUNTER_FILE),
+    fd = os.open(str(counter_file),
                  os.O_RDWR | os.O_CREAT, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)

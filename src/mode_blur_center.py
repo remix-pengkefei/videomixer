@@ -14,7 +14,7 @@ from src.sticker_pool import (
     get_color_scheme, get_anti_detect_filters, get_audio_filters,
     get_color_preset, get_lut_filters, get_speed_ramp,
     generate_sticker_positions, generate_sparkle_positions,
-    STRATEGIES, get_encoder_args,
+    STRATEGIES, get_encoder_args, get_base_dir,
 )
 
 
@@ -238,7 +238,7 @@ def process(input_path: str, output_path: str, video_index: int = 0,
 
     sparkle_style = config.get('sparkle_style', 'gold')
 
-    assets_dir = Path(__file__).parent.parent / "assets"
+    assets_dir = get_base_dir() / "assets"
     stickers = get_rotated_stickers(assets_dir, sticker_count, "health", video_index)
     sparkles = get_sparkle_overlays(assets_dir, sparkle_count, sparkle_style)
 

@@ -22,7 +22,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 # Add project root to path so we can import src modules
-PROJECT_ROOT = Path(__file__).parent.parent
+if getattr(sys, 'frozen', False):
+    # PyInstaller: executable is in bin/, project root is parent
+    PROJECT_ROOT = Path(sys.executable).parent.parent
+else:
+    PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.sticker_pool import generate_video_id
@@ -212,14 +216,20 @@ class TaskState:
 
 tasks: dict[str, TaskState] = {}
 ws_connections: dict[str, list[WebSocket]] = {}  # task_id -> list of ws
-RUN_PROCESSOR = str(Path(__file__).parent / "run_processor.py")
+if getattr(sys, 'frozen', False):
+    RUN_PROCESSOR = str(Path(sys.executable).parent / "videomixer-processor")
+else:
+    RUN_PROCESSOR = str(Path(__file__).parent / "run_processor.py")
 
 
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
+if getattr(sys, 'frozen', False):
+    FRONTEND_DIST = PROJECT_ROOT / "web" / "frontend" / "dist"
+else:
+    FRONTEND_DIST = Path(__file__).parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -1192,7 +1202,10 @@ async def _run_task(task: TaskState):
                     if mode == "concat":
                         run_config["_input_paths"] = all_paths
 
-                    cmd = [sys.executable, RUN_PROCESSOR, strategy, input_path, output_path, str(video_index)]
+                    if getattr(sys, 'frozen', False):
+                        cmd = [RUN_PROCESSOR, strategy, input_path, output_path, str(video_index)]
+                    else:
+                        cmd = [sys.executable, RUN_PROCESSOR, strategy, input_path, output_path, str(video_index)]
                     cmd.append(json.dumps(run_config))
                     _log(f"[CMD] {' '.join(cmd)}")
 

@@ -15,7 +15,7 @@ from src.sticker_pool import (
     get_color_scheme, get_anti_detect_filters, get_audio_filters,
     get_color_preset, get_lut_filters, get_speed_ramp,
     generate_sticker_positions, generate_sparkle_positions,
-    STRATEGIES, get_encoder_args,
+    STRATEGIES, get_encoder_args, get_base_dir,
 )
 
 # 播放器UI模板颜色主题
@@ -393,7 +393,7 @@ def process(input_path: str, output_path: str, video_index: int = 0,
     print(f"  UI主题: {PLAYER_THEMES[theme_idx]['name']}")
     print(f"  歌曲: {SONG_TITLES[song_idx][0]} - {SONG_TITLES[song_idx][1]}")
 
-    assets_dir = Path(__file__).parent.parent / "assets"
+    assets_dir = get_base_dir() / "assets"
     stickers = get_rotated_stickers(assets_dir, sticker_count, "emotional", video_index)
     sparkles = get_sparkle_overlays(assets_dir, sparkle_count, sparkle_style)
 
