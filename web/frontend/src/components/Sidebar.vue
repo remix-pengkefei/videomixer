@@ -38,11 +38,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div v-if="updateInfo" class="sidebar-update" @click="$emit('showUpdate')">
-        <span class="sidebar-update-dot"></span>
-        有新版本可用
-      </div>
-      <div class="sidebar-version">v1.0.0</div>
+      <div class="sidebar-version">v1.0</div>
     </div>
   </aside>
 </template>
@@ -50,10 +46,9 @@
 <script setup>
 defineProps({
   activePlatform: { type: String, default: 'weixin' },
-  updateInfo: { type: Object, default: null },
 })
 
-defineEmits(['selectPlatform', 'showUpdate'])
+defineEmits(['selectPlatform'])
 
 // 16x16 SVG icons, single-color stroke style
 const S = {

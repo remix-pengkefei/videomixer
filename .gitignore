@@ -1,17 +1,6 @@
 # Assets (too large for GitHub)
-assets/19000 免抠贴纸素材/
-assets/overlays/
-assets/sparkles/
-assets/particles/
-assets/stickers/
-assets/mix_stickers/
-assets/animated/
-assets/png_downloads/
-assets/titles/
-assets/frames/
-assets/transitions/
-assets/outros/
-assets/intros/
+assets/
+workspace/
 
 # macOS
 .DS_Store

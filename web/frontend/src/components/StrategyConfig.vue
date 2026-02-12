@@ -5,6 +5,42 @@
       <p class="strategy-page-desc">设置各类混剪的默认参数，新任务将自动使用这些配置</p>
     </div>
 
+    <!-- Strategy Presets Overview -->
+    <div class="presets-overview">
+      <h3 class="presets-title">策略预设 (A-E)</h3>
+      <div class="presets-grid">
+        <div
+          v-for="p in presetList"
+          :key="p.id"
+          class="preset-card"
+          :class="{ recommended: p.id === 'D' }"
+        >
+          <div class="preset-card-id">{{ p.id }}</div>
+          <div class="preset-card-name">{{ p.name }}</div>
+          <div class="preset-card-desc">{{ p.description }}</div>
+          <div v-if="p.id === 'D'" class="preset-badge">推荐</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mixing Modes Overview -->
+    <div class="presets-overview">
+      <h3 class="presets-title">混剪模式</h3>
+      <div class="modes-grid">
+        <div
+          v-for="m in modeList"
+          :key="m.id"
+          class="mode-card"
+        >
+          <div class="mode-card-icon">{{ modeIcon(m.id) }}</div>
+          <div class="mode-card-name">{{ m.name }}</div>
+          <div class="mode-card-desc">{{ m.description }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-Strategy Config -->
+    <h3 class="presets-title" style="margin-top: 28px;">分类默认配置</h3>
     <div
       v-for="s in strategyList"
       :key="s.id"
@@ -142,6 +178,10 @@ const effectToggles = [
   { key: 'enable_border', label: '边框' },
   { key: 'enable_color_preset', label: '调色滤镜' },
   { key: 'enable_audio_fx', label: '音频调整' },
+  { key: 'enable_lut', label: 'LUT调色' },
+  { key: 'enable_speed_ramp', label: '变速曲线' },
+  { key: 'enable_lens_effect', label: '镜头效果' },
+  { key: 'enable_glitch', label: '故障特效' },
 ]
 
 const strategyList = [
@@ -149,6 +189,33 @@ const strategyList = [
   { id: 'emotional', name: '情感混剪', description: '情感/励志类视频，粉紫配色' },
   { id: 'health', name: '养生混剪', description: '养生/健康类视频，暖色配色' },
 ]
+
+const presetList = [
+  { id: 'A', name: '极简隐形', description: '最少装饰，几乎不可见的修改' },
+  { id: 'B', name: '边框画框', description: '边框为主，画框式装饰' },
+  { id: 'C', name: '角落点缀', description: '角落放置贴纸，不遮挡中心' },
+  { id: 'D', name: '智能避让', description: '智能检测内容区域，自动避让主体' },
+  { id: 'E', name: '动感变换', description: '最丰富的效果，动感十足' },
+]
+
+const modeList = [
+  { id: 'standard', name: '传统混剪', description: '标准贴纸+闪光+边框效果' },
+  { id: 'blur_center', name: '背景模糊居中', description: '模糊背景+居中内容' },
+  { id: 'fake_player', name: '假播放器', description: '假音乐播放器UI覆盖' },
+  { id: 'sandwich', name: '三层夹心', description: '上下层填充+中间内容' },
+  { id: 'concat', name: '多段串联', description: '重复拼接延长时长' },
+]
+
+function modeIcon(id) {
+  const icons = {
+    standard: '||',
+    blur_center: '[]',
+    fake_player: '>>',
+    sandwich: '===',
+    concat: '...',
+  }
+  return icons[id] || '?'
+}
 
 onMounted(() => {
   const strats = props.globalConfig?.strategies || {}
@@ -159,9 +226,9 @@ onMounted(() => {
 
 function getDefaults(id) {
   const map = {
-    handwriting: { sticker_count: 14, sparkle_count: 5, sparkle_style: 'gold', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true },
-    emotional: { sticker_count: 20, sparkle_count: 5, sparkle_style: 'pink', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true },
-    health: { sticker_count: 20, sparkle_count: 5, sparkle_style: 'warm', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true },
+    handwriting: { sticker_count: 14, sparkle_count: 5, sparkle_style: 'gold', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true, enable_lut: true, enable_speed_ramp: true, enable_lens_effect: true, enable_glitch: true },
+    emotional: { sticker_count: 20, sparkle_count: 5, sparkle_style: 'pink', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true, enable_lut: true, enable_speed_ramp: true, enable_lens_effect: true, enable_glitch: true },
+    health: { sticker_count: 20, sparkle_count: 5, sparkle_style: 'warm', color_scheme: 'random', enable_particles: true, enable_decorations: true, enable_border: true, enable_color_preset: true, enable_audio_fx: true, enable_lut: true, enable_speed_ramp: true, enable_lens_effect: true, enable_glitch: true },
   }
   return map[id] || map.handwriting
 }

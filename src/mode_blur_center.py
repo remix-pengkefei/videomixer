@@ -1,6 +1,7 @@
 """
-VideoMixer - 养生类视频超强混剪
-策略引擎版：5种策略 + 内容感知 + 反平台检测
+VideoMixer - 模式3：背景模糊居中
+将视频缩小居中显示，背景使用模糊放大版本（Apple Music 风格）
+支持叠加贴纸 + 反检测
 """
 
 import os
@@ -10,62 +11,45 @@ import json
 from pathlib import Path
 from src.sticker_pool import (
     get_rotated_stickers, get_sparkle_overlays, get_sticker_pool_info,
-    get_color_scheme, get_mask_filters, get_particle_filters,
-    get_decoration_filters, get_border_filters, get_color_preset,
-    get_audio_filters, get_lut_filters, get_speed_ramp,
-    get_lens_effect, get_glitch_effect,
-    STRATEGIES, generate_video_id, detect_content_zones,
+    get_color_scheme, get_anti_detect_filters, get_audio_filters,
+    get_color_preset, get_lut_filters, get_speed_ramp,
     generate_sticker_positions, generate_sparkle_positions,
-    get_anti_detect_filters, get_encoder_args,
+    STRATEGIES, get_encoder_args,
 )
 
 
 def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
-                 video_index: int = 0, video_type: str = "health",
-                 config: dict = None, strategy_config: dict = None,
-                 content_zones: list = None) -> tuple:
-    """构建滤镜"""
+                 video_index: int = 0, video_type: str = "blur_center",
+                 config: dict = None, strategy_config: dict = None) -> tuple:
+    """构建背景模糊居中滤镜"""
     if config is None:
         config = {}
     filters = []
 
-    if strategy_config:
-        for key in ["enable_particles", "enable_border", "enable_decorations",
-                     "enable_color_preset", "enable_lut", "enable_speed_ramp",
-                     "enable_lens_effect", "enable_glitch", "enable_audio_fx"]:
-            if key not in config:
-                config[key] = strategy_config.get(key, True)
-
+    # 反检测
     anti_detect = get_anti_detect_filters(strategy_config, video_index) if strategy_config else None
     pre_video = anti_detect["pre_video"] if anti_detect else "null"
     post_video = anti_detect["post_video"] if anti_detect else "null"
 
-    color_scheme_name = config.get('color_scheme', 'random')
-    if color_scheme_name and color_scheme_name != 'random':
-        from src.sticker_pool import COLOR_SCHEMES
-        if color_scheme_name in COLOR_SCHEMES:
-            scheme = COLOR_SCHEMES[color_scheme_name].copy()
-            scheme["name"] = color_scheme_name
-        else:
-            scheme = get_color_scheme(video_type, video_index)
-    else:
-        scheme = get_color_scheme(video_type, video_index)
-    mask_color = scheme["mask"]
+    # 配色
+    scheme = get_color_scheme(video_type, video_index)
     colors = scheme["colors"]
-    particle_colors = scheme["particle_colors"]
 
+    # 调色
     if config.get('enable_color_preset', True):
         color_preset, preset_name = get_color_preset(video_type, video_index)
     else:
         color_preset = "null"
         preset_name = "无"
 
+    # LUT
     if config.get('enable_lut', True):
         lut_filter, lut_name = get_lut_filters(video_type, video_index)
     else:
         lut_filter = "null"
         lut_name = "无"
 
+    # 变速
     if config.get('enable_speed_ramp', True):
         speed_video, speed_audio, speed_name = get_speed_ramp(video_index)
     else:
@@ -73,76 +57,80 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         speed_audio = "anull"
         speed_name = "无"
 
-    top_h = 220
-    bottom_h = 240
-    by = h - bottom_h
+    # 内容区域大小（居中显示的视频占比）
+    content_scale = config.get('content_scale', 0.65)  # 默认 65%
+    content_w = int(w * content_scale)
+    content_h = int(h * content_scale)
+    blur_radius = config.get('blur_radius', 25)
 
-    # 1. 反检测前置 + 缩放 + 变速 + 调色 + LUT
+    # 圆角半径
+    corner_radius = config.get('corner_radius', 20)
+
+    # 1. 反检测前置 + 变速 + 调色 + LUT，然后 split
     filters.append(
-        f"[0:v]{pre_video},"
-        f"scale={w}:{h}:force_original_aspect_ratio=decrease,"
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,"
-        f"{speed_video},{color_preset},{lut_filter}[base]"
+        f"[0:v]{pre_video},{speed_video},{color_preset},{lut_filter},"
+        f"split=2[src_bg][src_fg]"
     )
 
-    # 2. 遮罩
-    top_mask, bottom_mask, mask_style = get_mask_filters(
-        w, h, top_h, bottom_h, mask_color, video_index)
-    filters.append(f"[base]{top_mask}[v1]")
-    filters.append(f"[v1]{bottom_mask}[v2]")
+    # 2. 背景：放大 + 模糊
+    filters.append(
+        f"[src_bg]scale={w}:{h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h},boxblur={blur_radius}:{blur_radius},"
+        f"eq=brightness=-0.08:saturation=0.7[bg]"
+    )
 
-    # 3. 边框
-    if config.get('enable_border', True):
-        border_str, border_style = get_border_filters(w, h, colors, video_index)
-        if border_str:
-            filters.append(f"[v2]{border_str}[v3]")
-        else:
-            filters.append(f"[v2]null[v3]")
+    # 3. 前景：缩小
+    filters.append(
+        f"[src_fg]scale={content_w}:{content_h}:"
+        f"force_original_aspect_ratio=decrease,"
+        f"pad={content_w}:{content_h}:(ow-iw)/2:(oh-ih)/2:black@0,"
+        f"setsar=1,format=rgba[fg_raw]"
+    )
+
+    # 4. 圆角遮罩（可选）
+    if corner_radius > 0:
+        # 用 geq 生成圆角
+        r = corner_radius
+        filters.append(
+            f"[fg_raw]geq="
+            f"lum='lum(X,Y)':"
+            f"cb='cb(X,Y)':"
+            f"cr='cr(X,Y)':"
+            f"a='if(gt(abs(X-{r})+abs(Y-{r}),{r})*lt(X,{r})*lt(Y,{r}),0,"
+            f"if(gt(abs(X-W+{r})+abs(Y-{r}),{r})*gt(X,W-{r})*lt(Y,{r}),0,"
+            f"if(gt(abs(X-{r})+abs(Y-H+{r}),{r})*lt(X,{r})*gt(Y,H-{r}),0,"
+            f"if(gt(abs(X-W+{r})+abs(Y-H+{r}),{r})*gt(X,W-{r})*gt(Y,H-{r}),0,"
+            f"alpha(X,Y)))))'[fg]"
+        )
     else:
-        border_style = "无"
-        filters.append(f"[v2]null[v3]")
+        filters.append("[fg_raw]null[fg]")
 
-    # 4. 装饰
-    if config.get('enable_decorations', True):
-        deco_str, deco_style = get_decoration_filters(
-            w, h, top_h, bottom_h, colors, video_index)
-        filters.append(f"[v3]{deco_str}[v4]")
-    else:
-        deco_style = "无"
-        filters.append(f"[v3]null[v4]")
+    # 5. 合成：背景 + 前景居中
+    ox = (w - content_w) // 2
+    oy = (h - content_h) // 2
+    filters.append(
+        f"[bg][fg]overlay=x={ox}:y={oy}:format=auto[composed]"
+    )
 
-    # 5. 光晕
-    glow = [
-        f"drawbox=x=0:y={h // 3}:w=60:h={h // 3}:c={colors[0]}@0.15:t=fill",
-        f"drawbox=x={w - 60}:y={h // 3}:w=60:h={h // 3}:c={colors[4 % len(colors)]}@0.15:t=fill",
-    ]
-    filters.append(f"[v4]{','.join(glow)}[v5]")
+    # 6. 可选：添加细边框
+    border_color = colors[0] if colors else "#FFFFFF"
+    border_w = 2
+    bx = ox - border_w
+    by_top = oy - border_w
+    bw = content_w + border_w * 2
+    bh = content_h + border_w * 2
+    filters.append(
+        f"[composed]drawbox=x={bx}:y={by_top}:w={bw}:h={bh}:"
+        f"c={border_color}@0.4:t={border_w}[v_base]"
+    )
 
-    # 6. 粒子
-    if config.get('enable_particles', True):
-        particle_str, particle_style = get_particle_filters(
-            w, h, top_h, bottom_h, particle_colors, 45, video_index)
-        filters.append(f"[v5]{particle_str}[v6]")
-    else:
-        particle_style = "无"
-        filters.append(f"[v5]null[v6]")
-
-    # 7. 镜头效果
-    if config.get('enable_lens_effect', True):
-        lens_str, lens_name = get_lens_effect(video_type, video_index)
-        filters.append(f"[v6]{lens_str}[v6a]")
-    else:
-        lens_name = "无"
-        filters.append(f"[v6]null[v6a]")
-
-    # 8. 贴纸（策略化定位）
-    current = "[v6a]"
+    # 7. 贴纸
+    current = "[v_base]"
     input_idx = 1
     rng = random.Random()
-
-    stk_mode = strategy_config.get("sticker_position_mode", "edges_only") if strategy_config else "edges_only"
+    stk_mode = strategy_config.get("sticker_position_mode", "border_zone") if strategy_config else "border_zone"
     stk_positions = generate_sticker_positions(
-        w, h, len(sticker_files), stk_mode, content_zones, rng, strategy_config or {})
+        w, h, len(sticker_files), stk_mode, None, rng, strategy_config or {})
 
     for i, sticker_path in enumerate(sticker_files):
         if i >= len(stk_positions):
@@ -161,10 +149,10 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         current = out
         input_idx += 1
 
-    # 9. 闪光素材（策略化定位）
-    spk_mode = strategy_config.get("sparkle_position_mode", "edges_only") if strategy_config else "edges_only"
+    # 8. 闪光
+    spk_mode = strategy_config.get("sparkle_position_mode", "border_zone") if strategy_config else "border_zone"
     spk_positions = generate_sparkle_positions(
-        w, h, len(sparkle_files), spk_mode, content_zones, rng, strategy_config or {})
+        w, h, len(sparkle_files), spk_mode, None, rng, strategy_config or {})
 
     for j, sparkle_path in enumerate(sparkle_files):
         if j >= len(spk_positions):
@@ -182,23 +170,17 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
         current = out
         input_idx += 1
 
-    # 10. 故障特效
-    if config.get('enable_glitch', True):
-        glitch_str, glitch_name = get_glitch_effect(video_type, video_index)
-        final = filters[-1]
-        filters[-1] = final.rsplit('[', 1)[0] + '[vpre]'
-        filters.append(f"[vpre]{glitch_str}[vout]")
+    # 9. 反检测后置
+    final = filters[-1]
+    if post_video != "null":
+        filters[-1] = final.rsplit('[', 1)[0] + '[vpst]'
+        filters.append(f"[vpst]{post_video}[vout]")
     else:
-        glitch_name = "无"
-        final = filters[-1]
         filters[-1] = final.rsplit('[', 1)[0] + '[vout]'
 
-    # 11. 反检测后置
-    if post_video != "null":
-        filters[-1] = filters[-1].replace('[vout]', '[vpst]')
-        filters.append(f"[vpst]{post_video}[vout]")
-
     video_filter = ";".join(filters)
+
+    # 音频
     if config.get('enable_audio_fx', True):
         audio_filter, audio_effect = get_audio_filters(video_index)
     else:
@@ -212,20 +194,19 @@ def build_filter(w: int, h: int, sticker_files: list, sparkle_files: list,
             audio_filter = speed_audio
 
     info = {
-        "配色": scheme["name"], "遮罩": mask_style, "边框": border_style,
-        "装饰": deco_style, "粒子": particle_style, "调色": preset_name,
-        "LUT": lut_name, "变速": speed_name, "镜头": lens_name,
-        "故障": glitch_name, "音效": audio_effect,
+        "模式": "背景模糊居中",
+        "配色": scheme["name"], "调色": preset_name,
+        "LUT": lut_name, "变速": speed_name,
+        "音效": audio_effect, "内容占比": f"{content_scale:.0%}",
+        "模糊半径": blur_radius,
     }
-    if strategy_config:
-        info["策略"] = strategy_config.get("name", "?")
-        info["反检测"] = "crop+hue+grain+pitch"
 
     return video_filter, audio_filter, info, anti_detect
 
 
 def process(input_path: str, output_path: str, video_index: int = 0,
             config: dict = None, strategy: str = None) -> bool:
+    """处理视频 - 背景模糊居中模式"""
     if not os.path.exists(input_path):
         print(f"文件不存在: {input_path}")
         return False
@@ -237,7 +218,7 @@ def process(input_path: str, output_path: str, video_index: int = 0,
     duration = float(data.get('format', {}).get('duration', 60))
 
     print(f"\n{'=' * 60}")
-    print("养生类视频超强混剪 (策略引擎版)")
+    print("背景模糊居中模式")
     print(f"{'=' * 60}")
     print(f"输入: {Path(input_path).name}")
     print(f"时长: {duration:.1f}秒")
@@ -251,17 +232,11 @@ def process(input_path: str, output_path: str, video_index: int = 0,
         rng = random.Random()
         sticker_count = rng.randint(*strategy_config["sticker_count"])
         sparkle_count = rng.randint(*strategy_config["sparkle_count"])
-        sparkle_style = config.get('sparkle_style', 'warm')
-        print(f"策略: {strategy} - {strategy_config['name']} ({strategy_config['desc']})")
     else:
-        sticker_count = config.get('sticker_count', 20)
-        sparkle_count = config.get('sparkle_count', 5)
-        sparkle_style = config.get('sparkle_style', 'warm')
+        sticker_count = config.get('sticker_count', 8)
+        sparkle_count = config.get('sparkle_count', 3)
 
-    content_zones = None
-    if strategy_config and strategy_config.get("sticker_position_mode") == "content_aware":
-        print("  正在分析视频内容区域...")
-        content_zones = detect_content_zones(input_path)
+    sparkle_style = config.get('sparkle_style', 'gold')
 
     assets_dir = Path(__file__).parent.parent / "assets"
     stickers = get_rotated_stickers(assets_dir, sticker_count, "health", video_index)
@@ -269,13 +244,12 @@ def process(input_path: str, output_path: str, video_index: int = 0,
 
     w, h = 720, 1280
     video_filter, audio_filter, info, anti_detect = build_filter(
-        w, h, stickers, sparkles, video_index, "health",
-        config=config, strategy_config=strategy_config, content_zones=content_zones)
+        w, h, stickers, sparkles, video_index, "blur_center",
+        config=config, strategy_config=strategy_config)
 
     print(f"贴纸: {len(stickers)}个 | 闪光: {len(sparkles)}个")
     for k, v in info.items():
         print(f"  {k}: {v}")
-    print(get_sticker_pool_info())
     print("\n处理中...")
 
     if anti_detect and anti_detect.get("audio_mod"):
@@ -310,8 +284,7 @@ def process(input_path: str, output_path: str, video_index: int = 0,
 
     try:
         proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         last_lines = []
         for line in proc.stderr:
             line = line.rstrip()
@@ -329,28 +302,9 @@ def process(input_path: str, output_path: str, video_index: int = 0,
 
         out_size = os.path.getsize(output_path) / 1024 / 1024
         in_size = os.path.getsize(input_path) / 1024 / 1024
-
-        print(f"\n{'=' * 60}")
-        print("完成!")
-        print(f"输入: {in_size:.1f}MB → 输出: {out_size:.1f}MB")
-        print(f"{'=' * 60}")
+        print(f"\n完成! {in_size:.1f}MB → {out_size:.1f}MB")
         return True
 
     except Exception as e:
         print(f"错误: {e}")
         return False
-
-
-if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) < 2:
-        print("用法: python -m src.enhanced_health <视频> [输出] [策略A-E]")
-        sys.exit(1)
-
-    inp = sys.argv[1]
-    out = sys.argv[2] if len(sys.argv) > 2 else str(Path(inp).parent / f"{Path(inp).stem}_养生版.mp4")
-    strat = sys.argv[3] if len(sys.argv) > 3 else None
-
-    if not process(inp, out, strategy=strat):
-        sys.exit(1)

@@ -82,6 +82,10 @@ const effectItems = [
   { key: 'text_styles', label: '文字效果' },
   { key: 'audio_effects', label: '音频调整' },
   { key: 'color_presets', label: '调色预设' },
+  { key: 'lut_presets', label: 'LUT调色' },
+  { key: 'speed_ramps', label: '变速曲线' },
+  { key: 'lens_effects', label: '镜头效果' },
+  { key: 'glitch_effects', label: '故障特效' },
 ]
 
 function styleLabel(style) {

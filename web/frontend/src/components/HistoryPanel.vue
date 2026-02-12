@@ -50,6 +50,19 @@
             <span class="history-elapsed">{{ formatElapsed(task.elapsed) }}</span>
           </div>
 
+          <!-- Quick download button (no expand needed) -->
+          <button
+            v-if="task.completed > 0"
+            class="history-dl-btn"
+            title="下载全部"
+            @click.stop="downloadAll(task.id)"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 2v8M4 7l3 3 3-3"/>
+              <path d="M2 11h10"/>
+            </svg>
+          </button>
+
           <span class="history-expand-icon">
             {{ expandedIds.has(task.id) ? '▴' : '▾' }}
           </span>
@@ -78,7 +91,7 @@
           </div>
 
           <div v-if="task.file_results?.length" class="history-files">
-            <div class="history-files-title">文件详情</div>
+            <div class="history-files-title">处理详情</div>
             <div
               v-for="(fr, i) in task.file_results"
               :key="i"
@@ -127,8 +140,16 @@ async function clearHistory() {
 
 function toggleExpand(id) {
   const s = new Set(expandedIds.value)
-  if (s.has(id)) { s.delete(id) } else { s.add(id) }
+  if (s.has(id)) {
+    s.delete(id)
+  } else {
+    s.add(id)
+  }
   expandedIds.value = s
+}
+
+function downloadAll(taskId) {
+  window.location.href = `/api/download/${taskId}/all`
 }
 
 function formatTime(ts) {

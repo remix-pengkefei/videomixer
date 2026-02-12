@@ -10,13 +10,11 @@
     <template v-else>
       <Sidebar
         :active-platform="activePlatform"
-        :update-info="updateInfo"
         @select-platform="activePlatform = $event"
-        @show-update="showUpdateDialog"
       />
 
       <div class="main-area">
-        <AppHeader :current-tab="currentTab" @change-tab="currentTab = $event" />
+        <AppHeader :current-tab="currentTab" :update-info="updateInfo" @change-tab="currentTab = $event" @update-checked="onUpdateChecked" @update-done="updateInfo = null" />
 
         <main class="main-content">
           <!-- ===== Tab: Processing ===== -->
@@ -34,68 +32,32 @@
                 :all-files="allFiles"
                 :elapsed="elapsed"
                 :log-lines="logLines"
+                :task-id="taskId"
                 @cancel="cancelTask"
+                @download-all="downloadAll"
                 @reset="resetTask"
-                @open-folder="openOutputDir"
               />
             </template>
 
             <!-- === Setup View (no active task) === -->
             <template v-else>
-              <!-- I/O Directories -->
-              <div class="io-card">
-                <div class="io-row">
-                  <div class="io-label">输入目录</div>
-                  <FolderPicker
-                    compact
-                    :path="inputDir"
-                    placeholder="选择包含视频的文件夹"
-                    @select="onSelectInput"
-                  />
-                </div>
-                <div class="io-divider"></div>
-                <div class="io-row">
-                  <div class="io-label">输出目录</div>
-                  <FolderPicker
-                    compact
-                    :path="outputDir"
-                    placeholder="选择混剪结果保存位置"
-                    @select="onSelectOutput"
-                  />
-                </div>
-              </div>
+              <!-- Upload Area -->
+              <FileUploader
+                :session-id="sessionId"
+                @categories-changed="onCategoriesChanged"
+              />
 
-              <!-- Category Summary -->
-              <div v-if="categories.length > 0" class="category-summary-bar">
-                <span class="check-icon">&#10003;</span>
-                已识别 <strong>{{ categories.length }}</strong> 个分类，共 <strong>{{ totalVideos }}</strong> 个视频
-              </div>
-
-              <div v-else-if="inputDir" class="empty-notice">
-                未检测到视频文件
-              </div>
-
-              <!-- Category Cards -->
-              <CategoryList
+              <!-- Video List (after upload) -->
+              <VideoList
                 v-if="categories.length > 0"
                 :categories="categories"
                 :strategies="strategies"
-                :configs="categoryConfigs"
-                :task-active="false"
-                @update-strategy="onUpdateStrategy"
-                @update-config="onUpdateConfig"
+                :strategy-presets="strategyPresets"
+                :mixing-modes="mixingModes"
+                :outputs="globalOutputs"
+                @update-outputs="globalOutputs = $event"
+                @start="startTask"
               />
-
-              <!-- Start Button -->
-              <div v-if="categories.length > 0" class="action-row">
-                <button
-                  class="btn-start"
-                  :disabled="!canStart"
-                  @click="startTask"
-                >
-                  开始处理
-                </button>
-              </div>
             </template>
           </template>
 
@@ -121,43 +83,16 @@
         </main>
       </div>
 
-      <!-- Update Dialog -->
-      <div v-if="showUpdate" class="modal-overlay" @click.self="showUpdate = false">
-        <div class="modal" style="max-width: 420px;">
-          <div class="modal-header">
-            <span class="modal-title">发现新版本</span>
-            <button class="modal-close" @click="showUpdate = false">&times;</button>
-          </div>
-          <div class="modal-body" style="padding: 20px 24px;">
-            <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
-              GitHub 仓库有 <strong>{{ updateInfo?.ahead }}</strong> 个新提交
-            </p>
-            <div v-if="updateInfo?.commits?.length" class="update-commits">
-              <div
-                v-for="c in updateInfo.commits"
-                :key="c.sha"
-                class="update-commit"
-              >
-                <span class="update-commit-sha">{{ c.sha.slice(0, 7) }}</span>
-                <span class="update-commit-msg">{{ c.message }}</span>
-              </div>
-            </div>
-            <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 12px;">
-              运行 <code style="background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px;">git pull</code> 更新代码
-            </p>
-          </div>
-        </div>
-      </div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import Sidebar from './components/Sidebar.vue'
 import AppHeader from './components/Header.vue'
-import FolderPicker from './components/FolderPicker.vue'
-import CategoryList from './components/CategoryList.vue'
+import FileUploader from './components/FileUploader.vue'
+import VideoList from './components/VideoList.vue'
 import ProgressPanel from './components/ProgressPanel.vue'
 import EnvCheck from './components/EnvCheck.vue'
 import AssetLibrary from './components/AssetLibrary.vue'
@@ -169,15 +104,18 @@ const phase = ref('env-check')
 const currentTab = ref('processing')
 const activePlatform = ref('weixin')
 const updateInfo = ref(null)
-const showUpdate = ref(false)
 
-const inputDir = ref('')
-const outputDir = ref('')
+// Session ID for upload workspace (fresh each page load)
+const sessionId = ref(crypto.randomUUID().slice(0, 12))
+
 const categories = ref([])
 const strategies = ref([])
-const categoryConfigs = reactive({})
-const manuallyEdited = reactive({})
+const strategyPresets = ref([])
+const mixingModes = ref([])
 const globalConfig = ref({})
+
+// Global output config: each entry = { mode, preset }
+const globalOutputs = ref([{ mode: 'standard', preset: 'D' }])
 
 const taskId = ref(null)
 const taskStatus = ref('')
@@ -192,61 +130,7 @@ const allFiles = ref([])
 
 let ws = null
 
-const canStart = computed(() => {
-  return inputDir.value && outputDir.value && categories.value.length > 0 && !taskId.value
-})
-
-const totalVideos = computed(() => {
-  return categories.value.reduce((sum, c) => sum + c.video_count, 0)
-})
-
-function getDefaultConfig(strategy) {
-  const globalStrats = globalConfig.value?.strategies || {}
-  const g = globalStrats[strategy]
-  if (g) {
-    return {
-      sticker_count: g.sticker_count ?? 14,
-      sparkle_count: g.sparkle_count ?? 5,
-      sparkle_style: g.sparkle_style ?? 'gold',
-      color_scheme: g.color_scheme ?? 'random',
-      enable_particles: g.enable_particles ?? true,
-      enable_decorations: g.enable_decorations ?? true,
-      enable_border: g.enable_border ?? true,
-      enable_color_preset: g.enable_color_preset ?? true,
-      enable_audio_fx: g.enable_audio_fx ?? true,
-    }
-  }
-  const STRATEGY_DEFAULTS = {
-    handwriting: { sticker_count: 14, sparkle_count: 5, sparkle_style: 'gold' },
-    emotional:   { sticker_count: 20, sparkle_count: 5, sparkle_style: 'pink' },
-    health:      { sticker_count: 20, sparkle_count: 5, sparkle_style: 'warm' },
-  }
-  const d = STRATEGY_DEFAULTS[strategy] || STRATEGY_DEFAULTS.handwriting
-  return {
-    sticker_count: d.sticker_count,
-    sparkle_count: d.sparkle_count,
-    sparkle_style: d.sparkle_style,
-    color_scheme: 'random',
-    enable_particles: true,
-    enable_decorations: true,
-    enable_border: true,
-    enable_color_preset: true,
-    enable_audio_fx: true,
-  }
-}
-
-function initConfigs() {
-  for (const cat of categories.value) {
-    categoryConfigs[cat.folder] = getDefaultConfig(cat.strategy)
-    manuallyEdited[cat.folder] = new Set()
-  }
-}
-
-function showUpdateDialog() {
-  showUpdate.value = true
-}
-
-// Load global config, strategies, and check for updates on startup
+// Load global config and strategies on startup
 onMounted(async () => {
   try {
     const [cfgRes, stratRes] = await Promise.all([
@@ -256,104 +140,90 @@ onMounted(async () => {
     const cfg = await cfgRes.json()
     globalConfig.value = cfg
 
-    if (cfg.last_input_dir) inputDir.value = cfg.last_input_dir
-    if (cfg.last_output_dir) outputDir.value = cfg.last_output_dir
-
-    if (cfg.last_input_dir) {
-      try {
-        const scanRes = await fetch(`/api/scan?path=${encodeURIComponent(cfg.last_input_dir)}`)
-        const scanData = await scanRes.json()
-        categories.value = scanData.categories
-        initConfigs()
-      } catch (e) {}
-    }
-
     const stratData = await stratRes.json()
     strategies.value = stratData.strategies || stratData
+    strategyPresets.value = stratData.strategy_presets || []
+    mixingModes.value = stratData.mixing_modes || []
   } catch (e) {
     try {
       const res = await fetch('/api/strategies')
       const data = await res.json()
       strategies.value = data.strategies || data
+      strategyPresets.value = data.strategy_presets || []
+      mixingModes.value = data.mixing_modes || []
     } catch (_) {}
   }
-
-  // Check for updates (non-blocking)
-  try {
-    const res = await fetch('/api/check-update')
-    const data = await res.json()
-    if (data.has_update) {
-      updateInfo.value = data
-    }
-  } catch (e) {}
 })
 
-async function onSelectInput(path) {
-  inputDir.value = path
-  const res = await fetch(`/api/scan?path=${encodeURIComponent(path)}`)
-  const data = await res.json()
-  categories.value = data.categories
-  initConfigs()
-}
-
-function onSelectOutput(path) {
-  outputDir.value = path
-}
-
-function onUpdateStrategy(folder, strategy) {
-  const cat = categories.value.find(c => c.folder === folder)
-  if (cat) {
-    cat.strategy = strategy
-    const newDefaults = getDefaultConfig(strategy)
-    const edited = manuallyEdited[folder] || new Set()
-    const current = categoryConfigs[folder] || {}
-    for (const [key, val] of Object.entries(newDefaults)) {
-      if (!edited.has(key)) {
-        current[key] = val
-      }
-    }
-    categoryConfigs[folder] = { ...current }
+// Check for updates only AFTER entering main UI
+watch(phase, (val) => {
+  if (val === 'main') {
+    fetch('/api/check-update')
+      .then(r => r.json())
+      .then(data => {
+        if (data.has_update) {
+          updateInfo.value = data
+        }
+      })
+      .catch(() => {})
   }
-}
+})
 
-function onUpdateConfig(folder, key, value) {
-  if (!categoryConfigs[folder]) return
-  categoryConfigs[folder] = { ...categoryConfigs[folder], [key]: value }
-  if (!manuallyEdited[folder]) manuallyEdited[folder] = new Set()
-  manuallyEdited[folder].add(key)
+async function onCategoriesChanged() {
+  const res = await fetch(`/api/upload/${sessionId.value}/scan`)
+  const data = await res.json()
+  categories.value = data.categories || []
 }
 
 function onGlobalConfigSaved(cfg) {
   globalConfig.value = { ...cfg }
 }
 
+function onUpdateChecked(data) {
+  if (data.has_update) {
+    updateInfo.value = data
+  }
+}
+
 async function startTask() {
+  const outputs = globalOutputs.value
+  // All files share the same global outputs
   const body = {
-    input_dir: inputDir.value,
-    output_dir: outputDir.value,
-    categories: categories.value.map(c => ({
-      folder: c.folder,
-      strategy: c.strategy,
-      config: categoryConfigs[c.folder] || null,
-    })),
+    session_id: sessionId.value,
+    categories: categories.value.map(c => {
+      const fileList = (c.files || []).map(f => ({
+        filename: f,
+        outputs: outputs.map(o => ({ mode: o.mode, strategy_preset: o.preset })),
+      }))
+      return {
+        folder: c.folder,
+        strategy: c.strategy,
+        config: null,
+        files: fileList,
+      }
+    }),
   }
 
-  const res = await fetch('/api/tasks', {
+  const res = await fetch('/api/tasks/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
 
   // Build flat file list for progress display
+  const count = outputs.length
   const files = []
   for (const c of categories.value) {
     for (const f of (c.files || [])) {
-      files.push({
-        displayName: `${c.folder}/${f}`,
-        filename: f,
-        folder: c.folder,
-        strategy: c.strategy,
-      })
+      for (let i = 0; i < count; i++) {
+        const displayName = `${c.folder}/${f}` + (count > 1 ? ` #${i+1}` : '')
+        files.push({
+          displayName,
+          filename: f,
+          folder: c.folder,
+          strategy: c.strategy,
+        })
+      }
     }
   }
   allFiles.value = files
@@ -423,9 +293,15 @@ async function registerVideoStats() {
   const videos = fileResults.value
     .filter(r => r.status === 'done')
     .map(r => ({
-      id: `${taskId.value}_${r.filename}`,
+      id: r.video_id || `${taskId.value}_${r.filename}`,
+      video_id: r.video_id || '',
       task_id: taskId.value,
       filename: r.filename,
+      output_file: r.output_file || '',
+      folder: r.folder || '',
+      strategy: r.strategy || '',
+      mode: r.mode || 'standard',
+      strategy_preset: r.strategy_preset || 'D',
       platform: activePlatform.value,
       created_at: now,
       stats: {},
@@ -444,13 +320,10 @@ async function cancelTask() {
   await fetch(`/api/tasks/${taskId.value}/cancel`, { method: 'POST' })
 }
 
-async function openOutputDir() {
-  if (!outputDir.value) return
-  await fetch('/api/open-folder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: outputDir.value }),
-  })
+
+function downloadAll() {
+  if (!taskId.value) return
+  window.open(`/api/download/${taskId.value}/all`, '_blank')
 }
 
 function resetTask() {
@@ -464,6 +337,10 @@ function resetTask() {
   allFiles.value = []
   elapsed.value = 0
   logLines.value = []
+  // Reset session for fresh start
+  sessionId.value = crypto.randomUUID().slice(0, 12)
+  categories.value = []
+  globalOutputs.value = [{ mode: 'standard', preset: 'D' }]
 }
 
 onBeforeUnmount(() => {

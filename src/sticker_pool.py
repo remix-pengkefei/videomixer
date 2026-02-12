@@ -20,6 +20,8 @@ VideoMixer 效果池管理
 每个视频完全随机，确保每个视频风格都不同。
 """
 
+import fcntl
+import json as _json
 import os
 import random
 import hashlib
@@ -918,3 +920,599 @@ def get_sticker_pool_info() -> str:
         f"  LUT: {len(LUT_PRESETS)}种 | 变速: {len(SPEED_RAMPS)}种 | 镜头: {len(LENS_EFFECTS)}种 | 故障: {len(GLITCH_EFFECTS)}种\n"
         f"  闪光/特效素材: {sparkle_count}个"
     )
+
+
+# ============================================================
+# 15. Video ID System (支持 10万+/天)
+# ============================================================
+
+_VIDEO_ID_COUNTER_FILE = Path(__file__).parent.parent / "data" / "video_id_counter.json"
+
+
+def _load_and_increment_counter(key: str) -> int:
+    """从磁盘加载计数器，原子递增后写回。使用文件锁保证并发安全。"""
+    _VIDEO_ID_COUNTER_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    # 打开文件（不存在则创建）
+    fd = os.open(str(_VIDEO_ID_COUNTER_FILE),
+                 os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        raw = os.read(fd, 1 << 20)
+        data = _json.loads(raw) if raw.strip() else {}
+        data[key] = data.get(key, 0) + 1
+        new_val = data[key]
+        payload = _json.dumps(data, indent=2).encode()
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.ftruncate(fd, 0)
+        os.write(fd, payload)
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+    return new_val
+
+
+_videotoolbox_available = None
+
+def get_encoder_args(crf="18", preset="fast", bitrate="4000k"):
+    """返回 ffmpeg 视频编码参数列表。优先使用 VideoToolbox 硬件加速。"""
+    global _videotoolbox_available
+    if _videotoolbox_available is None:
+        import subprocess as _sp, shutil as _sh
+        ffmpeg = _sh.which("ffmpeg") or "ffmpeg"
+        try:
+            r = _sp.run([ffmpeg, '-hide_banner', '-encoders'],
+                        capture_output=True, text=True, timeout=5)
+            _videotoolbox_available = 'h264_videotoolbox' in (r.stdout or '')
+        except Exception:
+            _videotoolbox_available = False
+    if _videotoolbox_available:
+        return ['-c:v', 'h264_videotoolbox', '-b:v', bitrate, '-profile:v', 'high']
+    return ['-c:v', 'libx264', '-preset', preset, '-crf', str(crf)]
+
+
+def generate_video_id(category: str, strategy: str = "D",
+                      index: int = None, date_str: str = None) -> str:
+    """生成永久唯一视频ID（计数器持久化到磁盘）。
+
+    格式: VM-YYMMDD-CAT-SEQ5-HASH4
+    示例: VM-260211-SX-00042-a3f7
+
+    字段说明:
+      VM       固定前缀 (VideoMixer)
+      YYMMDD   日期
+      CAT      分类: SX=手写, QG=情感, YS=养生 (拼音首字母)
+      SEQ5     当日序号 (00001-99999, 每分类支持99999)
+      HASH4    4位校验哈希, 防碰撞
+
+    容量: 3分类 × 99999 = 299,997/天, 远超10万需求。
+    计数器持久化在 data/video_id_counter.json，重启不丢失。
+    """
+    cat_map = {"handwriting": "SX", "emotional": "QG", "health": "YS"}
+    cat = cat_map.get(category, "XX")
+
+    if date_str is None:
+        date_str = datetime.now().strftime("%y%m%d")
+
+    if index is None:
+        key = f"{date_str}_{cat}"
+        index = _load_and_increment_counter(key)
+
+    seq = f"{index:05d}"
+    raw = f"{date_str}{cat}{strategy}{seq}{random.random()}"
+    chk = hashlib.md5(raw.encode()).hexdigest()[:4]
+
+    return f"VM-{date_str}-{cat}-{seq}-{chk}"
+
+
+# ============================================================
+# 16. Content Zone Detection (视频主体区域识别)
+# ============================================================
+
+def detect_content_zones(video_path: str, w: int = 720, h: int = 1280,
+                         grid_cols: int = 6, grid_rows: int = 10) -> list:
+    """分析视频帧，检测内容密集区域。
+
+    返回二维列表 [row][col]，值 0.0=空白 ~ 1.0=内容密集。
+    高密度格子应避免放置贴纸/闪光。
+    """
+    import subprocess as _sp
+    import tempfile
+
+    try:
+        probe = _sp.run(
+            ['ffprobe', '-v', 'quiet', '-print_format', 'json',
+             '-show_format', video_path],
+            capture_output=True, text=True, timeout=10)
+        import json as _json
+        duration = float(_json.loads(probe.stdout).get('format', {}).get('duration', 10))
+        mid_time = duration / 2
+    except Exception:
+        mid_time = 5
+
+    tmp_frame = tempfile.mktemp(suffix='.png')
+    try:
+        _sp.run(
+            ['ffmpeg', '-y', '-ss', str(mid_time), '-i', video_path,
+             '-vframes', '1', '-vf', f'scale={w}:{h}',
+             '-loglevel', 'quiet', tmp_frame],
+            capture_output=True, timeout=15)
+
+        from PIL import Image
+        img = Image.open(tmp_frame).convert('L')
+        pixels = img.load()
+
+        cell_w = w // grid_cols
+        cell_h = h // grid_rows
+
+        grid = []
+        for row in range(grid_rows):
+            row_data = []
+            for col in range(grid_cols):
+                values = []
+                for y in range(row * cell_h, min((row + 1) * cell_h, h), 4):
+                    for x in range(col * cell_w, min((col + 1) * cell_w, w), 4):
+                        values.append(pixels[x, y])
+                if values:
+                    mean = sum(values) / len(values)
+                    variance = sum((v - mean) ** 2 for v in values) / len(values)
+                    density = min(1.0, variance / 2500)
+                else:
+                    density = 0.0
+                row_data.append(round(density, 3))
+            grid.append(row_data)
+        return grid
+    except Exception:
+        grid = []
+        for row in range(grid_rows):
+            row_data = []
+            for col in range(grid_cols):
+                cx = abs(col - grid_cols / 2) / (grid_cols / 2)
+                cy = abs(row - grid_rows / 2) / (grid_rows / 2)
+                density = max(0, 1.0 - (cx + cy) / 2)
+                row_data.append(round(density, 3))
+            grid.append(row_data)
+        return grid
+    finally:
+        if os.path.exists(tmp_frame):
+            os.remove(tmp_frame)
+
+
+# ============================================================
+# 17. Strategy-Based Position Generation
+# ============================================================
+
+def generate_sticker_positions(w: int, h: int, count: int, mode: str = "edges_only",
+                               content_zones: list = None, rng=None,
+                               strategy_config: dict = None) -> list:
+    """按策略模式生成贴纸位置。
+
+    返回 [(x, y, size, opacity, rotation_deg), ...]
+
+    模式:
+      corners_only  — 1-2个随机角落聚集
+      edges_only    — 四边分散，中心空白
+      border_zone   — 限制在60px边框带内
+      content_aware — 检测内容，只放在空白区
+      random_safe   — 随机但偏好边缘
+    """
+    if rng is None:
+        rng = random.Random()
+    if strategy_config is None:
+        strategy_config = {}
+    if count <= 0:
+        return []
+
+    size_range = strategy_config.get("sticker_size", (80, 160))
+    opacity_range = strategy_config.get("sticker_opacity", (0.5, 1.0))
+    rotation_range = strategy_config.get("sticker_rotation", (-15, 15))
+
+    positions = []
+
+    def _add(x, y):
+        s = rng.randint(*size_range)
+        o = round(rng.uniform(*opacity_range), 2)
+        r = round(rng.uniform(*rotation_range), 1)
+        positions.append((max(0, int(x)), max(0, int(y)), s, o, r))
+
+    if mode == "corners_only":
+        corners = [
+            (10, 10, 200, 200),
+            (w - 220, 10, 200, 200),
+            (10, h - 240, 200, 200),
+            (w - 220, h - 240, 200, 200),
+        ]
+        picked = rng.sample(corners, min(2, len(corners)))
+        per = max(1, count // len(picked) + 1)
+        for cx, cy, cw, ch in picked:
+            for _ in range(per):
+                if len(positions) >= count:
+                    break
+                _add(cx + rng.randint(0, cw), cy + rng.randint(0, ch))
+
+    elif mode == "edges_only":
+        for _ in range(count):
+            side = rng.choice(["top", "bottom", "left", "right"])
+            if side == "top":
+                _add(rng.randint(10, w - 150), rng.randint(5, 130))
+            elif side == "bottom":
+                _add(rng.randint(10, w - 150), rng.randint(h - 230, h - 30))
+            elif side == "left":
+                _add(rng.randint(0, 60), rng.randint(150, h - 260))
+            else:
+                _add(rng.randint(w - 170, w - 10), rng.randint(150, h - 260))
+
+    elif mode == "border_zone":
+        bw = 65
+        for _ in range(count):
+            side = rng.choice(["top", "bottom", "left", "right"])
+            if side == "top":
+                _add(rng.randint(0, w - 120), rng.randint(0, bw))
+            elif side == "bottom":
+                _add(rng.randint(0, w - 120), rng.randint(h - bw - 120, h - 20))
+            elif side == "left":
+                _add(rng.randint(0, bw), rng.randint(100, h - 200))
+            else:
+                _add(rng.randint(w - bw - 120, w - 10), rng.randint(100, h - 200))
+
+    elif mode == "content_aware" and content_zones:
+        gr = len(content_zones)
+        gc = len(content_zones[0]) if content_zones else 6
+        cw = w // gc
+        ch = h // gr
+        safe = [(r, c, content_zones[r][c]) for r in range(gr) for c in range(gc)
+                if content_zones[r][c] < 0.35]
+        safe.sort(key=lambda x: x[2])
+        if not safe:
+            safe = [(r, c, 0) for r in range(gr) for c in range(gc)
+                    if c == 0 or c == gc - 1 or r == 0 or r >= gr - 2]
+        for i in range(count):
+            if not safe:
+                break
+            r, c, _ = safe[i % len(safe)]
+            _add(c * cw + rng.randint(5, max(10, cw - 80)),
+                 r * ch + rng.randint(5, max(10, ch - 80)))
+
+    else:  # random_safe
+        for _ in range(count):
+            if rng.random() < 0.75:
+                side = rng.choice(["top", "bottom", "left", "right"])
+                if side == "top":
+                    _add(rng.randint(10, w - 150), rng.randint(5, h // 5))
+                elif side == "bottom":
+                    _add(rng.randint(10, w - 150), rng.randint(4 * h // 5, h - 30))
+                elif side == "left":
+                    _add(rng.randint(0, w // 6), rng.randint(100, h - 200))
+                else:
+                    _add(rng.randint(5 * w // 6, w - 30), rng.randint(100, h - 200))
+            else:
+                _add(rng.randint(10, w - 100), rng.randint(10, h - 100))
+
+    return positions[:count]
+
+
+def generate_sparkle_positions(w: int, h: int, count: int, mode: str = "edges_only",
+                               content_zones: list = None, rng=None,
+                               strategy_config: dict = None) -> list:
+    """按策略模式生成闪光位置。
+
+    返回 [(x, y, size, opacity, phase, speed), ...]
+    """
+    if rng is None:
+        rng = random.Random()
+    if strategy_config is None:
+        strategy_config = {}
+    if count <= 0:
+        return []
+
+    size_range = strategy_config.get("sparkle_size", (100, 250))
+    opacity_range = strategy_config.get("sparkle_opacity", (0.3, 0.7))
+
+    results = []
+    for _ in range(count):
+        phase = round(rng.uniform(0, 6.28), 2)
+        speed = round(rng.uniform(1.0, 3.5), 1)
+        opacity = round(rng.uniform(*opacity_range), 2)
+        size = rng.randint(*size_range)
+
+        if mode == "corners_only":
+            corner = rng.choice([(20, 20), (w - 280, 20), (20, h - 320), (w - 280, h - 320)])
+            x = corner[0] + rng.randint(0, 50)
+            y = corner[1] + rng.randint(0, 50)
+        elif mode in ("edges_only", "border_zone"):
+            side = rng.choice(["top", "bottom", "left", "right"])
+            if side == "top":
+                x, y = rng.randint(10, w - 260), rng.randint(5, 160)
+            elif side == "bottom":
+                x, y = rng.randint(10, w - 260), rng.randint(h - 340, h - 40)
+            elif side == "left":
+                x, y = rng.randint(0, 110), rng.randint(100, h - 340)
+            else:
+                x, y = rng.randint(w - 290, w - 30), rng.randint(100, h - 340)
+        elif mode == "content_aware" and content_zones:
+            gr = len(content_zones)
+            gc = len(content_zones[0])
+            cw = w // gc
+            ch = h // gr
+            safe = [(r, c) for r in range(gr) for c in range(gc)
+                    if content_zones[r][c] < 0.25]
+            if safe:
+                r, c = rng.choice(safe)
+                x = c * cw + rng.randint(0, max(1, cw - 50))
+                y = r * ch + rng.randint(0, max(1, ch - 50))
+            else:
+                x = rng.randint(10, w - 260)
+                y = rng.randint(5, 160)
+        else:  # random_safe
+            if rng.random() < 0.85:
+                side = rng.choice(["top", "bottom", "left", "right"])
+                if side == "top":
+                    x, y = rng.randint(10, w - 260), rng.randint(5, 200)
+                elif side == "bottom":
+                    x, y = rng.randint(10, w - 260), rng.randint(h - 360, h - 40)
+                elif side == "left":
+                    x, y = rng.randint(0, 130), rng.randint(150, h - 360)
+                else:
+                    x, y = rng.randint(w - 310, w - 30), rng.randint(150, h - 360)
+            else:
+                x = rng.randint(10, w - 260)
+                y = rng.randint(10, h - 320)
+
+        results.append((max(0, int(x)), max(0, int(y)), size, opacity, phase, speed))
+    return results
+
+
+# ============================================================
+# 18. Anti-Detection Filters (反平台检测)
+# ============================================================
+
+def get_anti_detect_filters(strategy_config: dict, video_index: int = 0) -> dict:
+    """生成反检测滤镜。
+
+    返回 dict:
+      pre_video   — 视频链前端滤镜 (crop + hue)
+      post_video  — 视频链末端滤镜 (grain)
+      audio_mod   — 额外音频滤镜 (变调)
+      encoding    — 编码参数 {crf, preset}
+      strip_metadata — 是否清除元数据
+    """
+    if not strategy_config:
+        return {"pre_video": "null", "post_video": "null", "audio_mod": None,
+                "encoding": {"crf": "18", "preset": "fast"}, "strip_metadata": False}
+
+    rng = _get_rng(video_index, "antidetect")
+    ad = strategy_config.get("anti_detect", {})
+
+    result = {
+        "pre_video": "null",
+        "post_video": "null",
+        "audio_mod": None,
+        "encoding": {"crf": "18", "preset": "fast"},
+        "strip_metadata": ad.get("strip_metadata", True),
+    }
+
+    pre = []
+    post = []
+
+    # 1. Crop (asymmetric, 3-6%)
+    crop_range = ad.get("crop_range", (0, 0))
+    if crop_range[1] > 0:
+        cx = rng.uniform(*crop_range)
+        cy = rng.uniform(*crop_range)
+        lf = rng.uniform(0.3, 0.7) * cx
+        tf = rng.uniform(0.3, 0.7) * cy
+        pre.append(f"crop=iw*{1 - cx:.4f}:ih*{1 - cy:.4f}:iw*{lf:.4f}:ih*{tf:.4f}")
+
+    # 2. Hue shift (subtle)
+    hue_range = ad.get("hue_shift", (0, 0))
+    if abs(hue_range[1] - hue_range[0]) > 1:
+        hue_val = rng.uniform(*hue_range)
+        if abs(hue_val) > 1.5:
+            pre.append(f"hue=h={hue_val:.1f}")
+
+    # 3. Film grain
+    grain_range = ad.get("grain_strength", (0, 0))
+    if grain_range[1] > 0:
+        strength = rng.randint(*grain_range)
+        post.append(f"noise=c0s={strength}:c0f=t+u")
+
+    # 4. Audio pitch shift
+    pitch_range = ad.get("pitch_shift", (1.0, 1.0))
+    if pitch_range[0] < 1.0 or pitch_range[1] > 1.0:
+        pitch = rng.uniform(*pitch_range)
+        if abs(pitch - 1.0) > 0.005:
+            result["audio_mod"] = f"asetrate=44100*{pitch:.4f},aresample=44100"
+
+    # 5. Encoding randomization
+    if ad.get("randomize_encoding", False):
+        result["encoding"]["crf"] = str(rng.randint(18, 23))
+        result["encoding"]["preset"] = rng.choice(["fast", "medium"])
+
+    # 6. Speed shift (subtle global ±3-5%)
+    speed_range = ad.get("speed_shift", (1.0, 1.0))
+    if speed_range[0] < 1.0 or speed_range[1] > 1.0:
+        spd = rng.uniform(*speed_range)
+        if abs(spd - 1.0) > 0.005:
+            pre.append(f"setpts={1 / spd:.4f}*PTS")
+            atempo = f"atempo={spd:.4f}"
+            if result["audio_mod"]:
+                result["audio_mod"] += f",{atempo}"
+            else:
+                result["audio_mod"] = atempo
+
+    result["pre_video"] = ",".join(pre) if pre else "null"
+    result["post_video"] = ",".join(post) if post else "null"
+    return result
+
+
+# ============================================================
+# 19. Strategy Presets (5种混剪策略)
+# ============================================================
+
+STRATEGIES = {
+    "A": {
+        "name": "极简隐形",
+        "name_en": "stealth_minimal",
+        "desc": "最大反检测，最少视觉改动",
+        "sticker_count": (0, 3),
+        "sparkle_count": (0, 1),
+        "sticker_position_mode": "corners_only",
+        "sparkle_position_mode": "corners_only",
+        "sticker_size": (40, 90),
+        "sticker_opacity": (0.25, 0.55),
+        "sticker_rotation": (-5, 5),
+        "sparkle_size": (80, 150),
+        "sparkle_opacity": (0.2, 0.4),
+        "enable_particles": False,
+        "enable_border": False,
+        "enable_decorations": False,
+        "enable_mask": True,
+        "enable_color_preset": True,
+        "enable_lut": False,
+        "enable_speed_ramp": False,
+        "enable_lens_effect": False,
+        "enable_glitch": False,
+        "enable_audio_fx": True,
+        "anti_detect": {
+            "crop_range": (0.03, 0.06),
+            "grain_strength": (5, 12),
+            "hue_shift": (-10, 10),
+            "pitch_shift": (0.96, 1.04),
+            "speed_shift": (0.96, 1.04),
+            "strip_metadata": True,
+            "randomize_encoding": True,
+        },
+    },
+    "B": {
+        "name": "边框画框",
+        "name_en": "frame_border",
+        "desc": "装饰全在边框带，中心完全清晰",
+        "sticker_count": (6, 12),
+        "sparkle_count": (0, 2),
+        "sticker_position_mode": "border_zone",
+        "sparkle_position_mode": "border_zone",
+        "sticker_size": (60, 130),
+        "sticker_opacity": (0.5, 0.9),
+        "sticker_rotation": (-10, 10),
+        "sparkle_size": (80, 180),
+        "sparkle_opacity": (0.3, 0.6),
+        "enable_particles": False,
+        "enable_border": True,
+        "enable_decorations": True,
+        "enable_mask": True,
+        "enable_color_preset": True,
+        "enable_lut": True,
+        "enable_speed_ramp": False,
+        "enable_lens_effect": True,
+        "enable_glitch": False,
+        "enable_audio_fx": True,
+        "anti_detect": {
+            "crop_range": (0.02, 0.04),
+            "grain_strength": (3, 8),
+            "hue_shift": (-8, 8),
+            "pitch_shift": (0.97, 1.03),
+            "strip_metadata": True,
+            "randomize_encoding": True,
+        },
+    },
+    "C": {
+        "name": "角落点缀",
+        "name_en": "corner_accent",
+        "desc": "轻量不对称角落装饰",
+        "sticker_count": (3, 6),
+        "sparkle_count": (1, 3),
+        "sticker_position_mode": "corners_only",
+        "sparkle_position_mode": "corners_only",
+        "sticker_size": (60, 140),
+        "sticker_opacity": (0.4, 0.85),
+        "sticker_rotation": (-20, 20),
+        "sparkle_size": (100, 220),
+        "sparkle_opacity": (0.25, 0.55),
+        "enable_particles": True,
+        "enable_border": False,
+        "enable_decorations": False,
+        "enable_mask": True,
+        "enable_color_preset": True,
+        "enable_lut": True,
+        "enable_speed_ramp": False,
+        "enable_lens_effect": True,
+        "enable_glitch": False,
+        "enable_audio_fx": True,
+        "anti_detect": {
+            "crop_range": (0.02, 0.05),
+            "grain_strength": (4, 10),
+            "hue_shift": (-12, 12),
+            "pitch_shift": (0.97, 1.03),
+            "speed_shift": (0.97, 1.03),
+            "strip_metadata": True,
+            "randomize_encoding": True,
+        },
+    },
+    "D": {
+        "name": "智能避让",
+        "name_en": "content_aware",
+        "desc": "内容感知，自动避开主体阅读区",
+        "sticker_count": (6, 14),
+        "sparkle_count": (2, 4),
+        "sticker_position_mode": "content_aware",
+        "sparkle_position_mode": "content_aware",
+        "sticker_size": (50, 150),
+        "sticker_opacity": (0.3, 0.8),
+        "sticker_rotation": (-25, 25),
+        "sparkle_size": (100, 250),
+        "sparkle_opacity": (0.25, 0.6),
+        "enable_particles": True,
+        "enable_border": True,
+        "enable_decorations": True,
+        "enable_mask": True,
+        "enable_color_preset": True,
+        "enable_lut": True,
+        "enable_speed_ramp": True,
+        "enable_lens_effect": True,
+        "enable_glitch": False,
+        "enable_audio_fx": True,
+        "anti_detect": {
+            "crop_range": (0.02, 0.05),
+            "grain_strength": (4, 10),
+            "hue_shift": (-10, 10),
+            "pitch_shift": (0.96, 1.04),
+            "speed_shift": (0.97, 1.03),
+            "strip_metadata": True,
+            "randomize_encoding": True,
+        },
+    },
+    "E": {
+        "name": "动感变换",
+        "name_en": "dynamic_transform",
+        "desc": "最大视觉变换，强效果弱装饰",
+        "sticker_count": (3, 8),
+        "sparkle_count": (1, 3),
+        "sticker_position_mode": "random_safe",
+        "sparkle_position_mode": "edges_only",
+        "sticker_size": (50, 120),
+        "sticker_opacity": (0.2, 0.5),
+        "sticker_rotation": (-30, 30),
+        "sparkle_size": (80, 200),
+        "sparkle_opacity": (0.2, 0.45),
+        "enable_particles": True,
+        "enable_border": True,
+        "enable_decorations": True,
+        "enable_mask": True,
+        "enable_color_preset": True,
+        "enable_lut": True,
+        "enable_speed_ramp": True,
+        "enable_lens_effect": True,
+        "enable_glitch": False,
+        "enable_audio_fx": True,
+        "anti_detect": {
+            "crop_range": (0.03, 0.07),
+            "grain_strength": (6, 15),
+            "hue_shift": (-15, 15),
+            "pitch_shift": (0.95, 1.05),
+            "speed_shift": (0.95, 1.05),
+            "strip_metadata": True,
+            "randomize_encoding": True,
+        },
+    },
+}

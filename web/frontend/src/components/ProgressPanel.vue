@@ -18,12 +18,12 @@
       </div>
       <div class="pp-stats-right">
         <button v-if="status === 'running'" class="pp-btn-cancel" @click="$emit('cancel')">
-          取消
+          停止处理
         </button>
-        <button v-if="status && status !== 'running'" class="pp-btn-open" @click="$emit('openFolder')">
-          打开目录
+        <button v-if="isFinished && hasSuccessFiles" class="pp-btn-download" @click="$emit('download-all')">
+          下载全部
         </button>
-        <button v-if="status && status !== 'running'" class="pp-btn-back" @click="$emit('reset')">
+        <button v-if="isFinished" class="pp-btn-back" @click="$emit('reset')">
           返回
         </button>
       </div>
@@ -54,35 +54,37 @@
         ></div>
       </div>
 
-      <!-- Expandable file list -->
-      <div class="pp-file-toggle" @click="expanded = !expanded">
-        <span class="pp-toggle-icon">{{ expanded ? '\u25B4' : '\u25BE' }}</span>
-        <span>全部视频</span>
-        <span class="pp-toggle-count">{{ completed + failed }}/{{ total }}</span>
-      </div>
-
-      <div v-if="expanded" class="pp-file-list">
-        <div
-          v-for="(vf, i) in videoList"
-          :key="i"
-          :class="['pp-frow', vf.status]"
-        >
-          <span class="pp-frow-icon">
-            <template v-if="vf.status === 'done'">&#10003;</template>
-            <template v-else-if="vf.status === 'failed'">&#10007;</template>
-            <template v-else-if="vf.status === 'running'">
-              <span class="mini-spinner"></span>
-            </template>
-            <template v-else>&#9675;</template>
-          </span>
-          <span class="pp-frow-name">{{ vf.displayName }}</span>
-          <span v-if="vf.elapsed" class="pp-frow-time">{{ Math.round(vf.elapsed) }}s</span>
+      <!-- Running: expandable file list -->
+      <template v-if="!isFinished">
+        <div class="pp-file-toggle" @click="expanded = !expanded">
+          <span class="pp-toggle-icon">{{ expanded ? '\u25B4' : '\u25BE' }}</span>
+          <span>全部视频</span>
+          <span class="pp-toggle-count">{{ completed + failed }}/{{ total }}</span>
         </div>
-      </div>
+
+        <div v-if="expanded" class="pp-file-list">
+          <div
+            v-for="(vf, i) in videoList"
+            :key="i"
+            :class="['pp-frow', vf.status]"
+          >
+            <span class="pp-frow-icon">
+              <template v-if="vf.status === 'done'">&#10003;</template>
+              <template v-else-if="vf.status === 'failed'">&#10007;</template>
+              <template v-else-if="vf.status === 'running'">
+                <span class="mini-spinner"></span>
+              </template>
+              <template v-else>&#9675;</template>
+            </span>
+            <span class="pp-frow-name">{{ vf.displayName }}</span>
+            <span v-if="vf.elapsed" class="pp-frow-time">{{ Math.round(vf.elapsed) }}s</span>
+          </div>
+        </div>
+      </template>
     </div>
 
-    <!-- 3. Terminal -->
-    <div class="term">
+    <!-- 3. Running: Terminal -->
+    <div v-if="!isFinished" class="term">
       <div class="term-chrome">
         <div class="term-dots">
           <span class="term-dot red"></span>
@@ -91,8 +93,6 @@
         </div>
         <div class="term-title">
           <template v-if="currentFile">{{ currentFile }}</template>
-          <template v-else-if="status === 'completed'">Done</template>
-          <template v-else-if="status === 'failed'">Error</template>
           <template v-else>VideoMixer</template>
         </div>
         <div class="term-dots" style="visibility:hidden">
@@ -116,11 +116,38 @@
         <span v-if="status === 'running'" class="term-cursor"></span>
       </div>
     </div>
+
+    <!-- 4. Finished: Result List -->
+    <div v-if="isFinished" class="pp-results">
+      <div class="pp-results-header">处理结果</div>
+      <div class="pp-results-list">
+        <div
+          v-for="(vf, i) in videoList"
+          :key="i"
+          :class="['pp-result-row', vf.status]"
+        >
+          <span class="pp-result-icon">
+            <template v-if="vf.status === 'done'">&#10003;</template>
+            <template v-else-if="vf.status === 'failed'">&#10007;</template>
+            <template v-else>&#9675;</template>
+          </span>
+          <span class="pp-result-name">{{ vf.displayName }}</span>
+          <span v-if="vf.elapsed" class="pp-result-time">{{ Math.round(vf.elapsed) }}s</span>
+          <span v-if="vf.status === 'failed' && vf.error" class="pp-result-error">{{ vf.error }}</span>
+          <a
+            v-if="vf.status === 'done' && vf.downloadUrl"
+            class="pp-result-dl"
+            :href="vf.downloadUrl"
+            target="_blank"
+          >下载</a>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   status: String,
@@ -132,41 +159,44 @@ const props = defineProps({
   allFiles: { type: Array, default: () => [] },
   elapsed: Number,
   logLines: { type: Array, default: () => [] },
+  taskId: String,
 })
 
-defineEmits(['cancel', 'reset', 'openFolder'])
+defineEmits(['cancel', 'download-all', 'reset'])
 
 const termRef = ref(null)
 const expanded = ref(false)
+
+const isFinished = computed(() => {
+  return props.status && props.status !== 'running'
+})
+
+const hasSuccessFiles = computed(() => {
+  return (props.fileResults || []).some(r => r.status === 'done')
+})
 
 // --- Per-video progress parsing ---
 const videoDuration = ref(0)
 const currentTime = ref(0)
 
 const videoPercent = computed(() => {
-  // Task finished — show 100%
   if (props.status === 'completed' || props.status === 'failed' || props.status === 'cancelled') {
     return 100
   }
-  // No current file yet
   if (!props.currentFile) return 0
-  // Parse-based percentage
   if (videoDuration.value > 0 && currentTime.value > 0) {
     return Math.min(99, Math.round((currentTime.value / videoDuration.value) * 100))
   }
   return 0
 })
 
-// Parse log lines for duration and ffmpeg time=
 watch(() => props.logLines.length, () => {
   const lines = props.logLines
   if (lines.length === 0) return
 
-  // Check latest lines (usually the new ones)
   for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
     const line = lines[i]
 
-    // Parse total duration: "时长: 30.5秒"
     if (!videoDuration.value) {
       const durMatch = line.match(/时长:\s*(\d+\.?\d*)秒/)
       if (durMatch) {
@@ -174,7 +204,6 @@ watch(() => props.logLines.length, () => {
       }
     }
 
-    // Parse ffmpeg progress: "time=00:01:23.45"
     const timeMatch = line.match(/time=(\d+):(\d+):(\d+\.\d+)/)
     if (timeMatch) {
       const h = parseInt(timeMatch[1])
@@ -185,7 +214,6 @@ watch(() => props.logLines.length, () => {
   }
 })
 
-// Reset per-video progress when currentFile changes
 watch(() => props.currentFile, () => {
   videoDuration.value = 0
   currentTime.value = 0
@@ -214,7 +242,7 @@ onBeforeUnmount(() => {
 
 // --- Computed ---
 const statusText = computed(() => {
-  const map = { running: '处理中', completed: '已完成', failed: '有失败', cancelled: '已取消' }
+  const map = { running: '处理中', completed: '已完成', failed: '有失败', cancelled: '已停止' }
   return map[props.status] || props.status
 })
 
@@ -227,13 +255,19 @@ const videoList = computed(() => {
     const r = resultMap[f.displayName]
     let status = 'pending'
     let elapsed = null
+    let error = ''
+    let downloadUrl = ''
     if (r) {
       status = r.status
       elapsed = r.elapsed
+      error = r.error || ''
+      if (r.status === 'done' && r.folder && r.output_file && props.taskId) {
+        downloadUrl = `/api/download/${props.taskId}/${r.folder}/${r.output_file}`
+      }
     } else if (props.currentFile === f.displayName) {
       status = 'running'
     }
-    return { ...f, status, elapsed }
+    return { ...f, status, elapsed, error, downloadUrl }
   })
 })
 

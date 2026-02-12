@@ -89,10 +89,6 @@ const allReady = computed(() =>
   allChecks.value.every(c => c.status === 'ok')
 )
 
-const hasMissing = computed(() =>
-  allChecks.value.some(c => c.status === 'missing')
-)
-
 const ffmpegMissing = computed(() =>
   checks.ffmpeg.status === 'missing' || checks.ffprobe.status === 'missing'
 )

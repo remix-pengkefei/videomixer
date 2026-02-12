@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import shutil
+import zipfile
 import subprocess as sp
 import sys
 import time
@@ -14,7 +15,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -23,6 +24,8 @@ from pydantic import BaseModel
 # Add project root to path so we can import src modules
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.sticker_pool import generate_video_id
 
 # ---------------------------------------------------------------------------
 # Config
@@ -33,24 +36,38 @@ DATA_DIR.mkdir(exist_ok=True)
 CONFIG_FILE = DATA_DIR / "config.json"
 HISTORY_FILE = DATA_DIR / "history.json"
 
+WORKSPACE_DIR = PROJECT_ROOT / "workspace"
+UPLOADS_DIR = WORKSPACE_DIR / "uploads"
+OUTPUTS_DIR = WORKSPACE_DIR / "outputs"
+LOGS_DIR = WORKSPACE_DIR / "logs"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
 DEFAULT_STRATEGY_CONFIGS = {
     "handwriting": {
         "sticker_count": 14, "sparkle_count": 5, "sparkle_style": "gold",
         "color_scheme": "random", "enable_particles": True,
         "enable_decorations": True, "enable_border": True,
         "enable_color_preset": True, "enable_audio_fx": True,
+        "enable_lut": True, "enable_speed_ramp": True,
+        "enable_lens_effect": True, "enable_glitch": True,
     },
     "emotional": {
         "sticker_count": 20, "sparkle_count": 5, "sparkle_style": "pink",
         "color_scheme": "random", "enable_particles": True,
         "enable_decorations": True, "enable_border": True,
         "enable_color_preset": True, "enable_audio_fx": True,
+        "enable_lut": True, "enable_speed_ramp": True,
+        "enable_lens_effect": True, "enable_glitch": True,
     },
     "health": {
         "sticker_count": 20, "sparkle_count": 5, "sparkle_style": "warm",
         "color_scheme": "random", "enable_particles": True,
         "enable_decorations": True, "enable_border": True,
         "enable_color_preset": True, "enable_audio_fx": True,
+        "enable_lut": True, "enable_speed_ramp": True,
+        "enable_lens_effect": True, "enable_glitch": True,
     },
 }
 
@@ -121,6 +138,24 @@ STRATEGIES = [
     },
 ]
 
+# 5种策略预设 (A-E)
+STRATEGY_PRESETS = [
+    {"id": "D", "name": "D-智能避让", "description": "智能检测内容区域，自动避让主体，推荐默认"},
+    {"id": "A", "name": "A-极简隐形", "description": "最少装饰，几乎不可见的修改"},
+    {"id": "B", "name": "B-边框画框", "description": "边框为主，画框式装饰"},
+    {"id": "C", "name": "C-角落点缀", "description": "角落放置贴纸和闪光，不遮挡中心"},
+    {"id": "E", "name": "E-动感变换", "description": "最丰富的效果，动感十足"},
+]
+
+# 混剪模式
+MIXING_MODES = [
+    {"id": "standard", "name": "传统混剪", "description": "标准贴纸+闪光+边框效果"},
+    {"id": "blur_center", "name": "背景模糊居中", "description": "模糊背景+居中内容，类似Apple Music风格"},
+    {"id": "fake_player", "name": "假播放器", "description": "假音乐播放器UI覆盖，伪装为音乐App"},
+    {"id": "sandwich", "name": "三层夹心", "description": "上下层填充视频+中间层内容，三层拼接"},
+    {"id": "concat", "name": "多段串联", "description": "将视频重复拼接延长至目标时长"},
+]
+
 SPARKLE_STYLES = ["gold", "pink", "warm", "cool", "mixed"]
 COLOR_SCHEME_OPTIONS = [
     "random", "金色暖调", "冷色优雅", "莫兰迪", "粉紫甜美",
@@ -163,6 +198,7 @@ class TaskState:
     total_count: int = 0
     file_results: list = field(default_factory=list)
     cancel_requested: bool = False
+    _current_proc: object = field(default=None, repr=False)
 
     def to_dict(self):
         d = asdict(self)
@@ -206,15 +242,31 @@ app.add_middleware(
 # Pydantic models
 # ---------------------------------------------------------------------------
 
+class OutputConfig(BaseModel):
+    mode: str = "standard"
+    strategy_preset: str = "D"
+
+
+class FileConfig(BaseModel):
+    filename: str
+    outputs: list[OutputConfig] = [OutputConfig()]
+
+
 class CategoryInput(BaseModel):
     folder: str
     strategy: str
     config: Optional[dict] = None
+    files: list[FileConfig] = []
 
 
 class CreateTaskBody(BaseModel):
     input_dir: str
     output_dir: str
+    categories: list[CategoryInput]
+
+
+class UploadTaskBody(BaseModel):
+    session_id: str
     categories: list[CategoryInput]
 
 
@@ -270,7 +322,7 @@ async def scan_input(path: str):
 
         # Auto-detect strategy from folder name
         folder_lower = sub.name.lower()
-        strategy = "handwriting"  # default
+        strategy = "none"
         for key, val in STRATEGY_MAP.items():
             if key in folder_lower:
                 strategy = val
@@ -290,7 +342,7 @@ async def scan_input(path: str):
                        if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS and not f.name.startswith('.')]
         if root_videos:
             folder_lower = target.name.lower()
-            strategy = "handwriting"
+            strategy = "none"
             for key, val in STRATEGY_MAP.items():
                 if key in folder_lower:
                     strategy = val
@@ -311,6 +363,8 @@ async def scan_input(path: str):
 async def get_strategies():
     return {
         "strategies": STRATEGIES,
+        "strategy_presets": STRATEGY_PRESETS,
+        "mixing_modes": MIXING_MODES,
         "sparkle_styles": SPARKLE_STYLES,
         "color_schemes": COLOR_SCHEME_OPTIONS,
     }
@@ -363,6 +417,10 @@ async def get_assets_overview():
             "text_styles": 6,
             "audio_effects": 5,
             "color_presets": 8,
+            "lut_presets": 10,
+            "speed_ramps": 7,
+            "lens_effects": 9,
+            "glitch_effects": 8,
         }
     }
 
@@ -413,18 +471,13 @@ async def env_check():
 
 @app.get("/api/check-update")
 async def check_update():
-    """Check remote origin for new commits via git fetch."""
-    try:
-        # git fetch origin (silent, timeout 15s)
-        fetch_proc = await asyncio.create_subprocess_exec(
-            "git", "fetch", "origin",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(PROJECT_ROOT),
-        )
-        await asyncio.wait_for(fetch_proc.communicate(), timeout=15)
+    """Check GitHub for new commits via REST API (no credentials needed)."""
+    import re
+    import urllib.request
+    import urllib.error
 
-        # Get local HEAD
+    try:
+        # Get local HEAD (local only, no network)
         proc = await asyncio.create_subprocess_exec(
             "git", "rev-parse", "HEAD",
             stdout=asyncio.subprocess.PIPE,
@@ -436,7 +489,7 @@ async def check_update():
         if not local_sha:
             return {"has_update": False, "error": "Not a git repo"}
 
-        # Get current branch
+        # Get current branch (local only)
         proc2 = await asyncio.create_subprocess_exec(
             "git", "rev-parse", "--abbrev-ref", "HEAD",
             stdout=asyncio.subprocess.PIPE,
@@ -446,35 +499,75 @@ async def check_update():
         stdout2, _ = await proc2.communicate()
         branch = stdout2.decode().strip() or "main"
 
-        # Check commits between local and origin
+        # Get GitHub owner/repo from git remote URL
         proc3 = await asyncio.create_subprocess_exec(
-            "git", "log", f"HEAD..origin/{branch}", "--oneline", "--no-decorate",
+            "git", "remote", "get-url", "origin",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(PROJECT_ROOT),
         )
-        stdout3, stderr3 = await proc3.communicate()
-        lines = [l.strip() for l in stdout3.decode().strip().split("\n") if l.strip()]
+        stdout3, _ = await proc3.communicate()
+        remote_url = stdout3.decode().strip()
 
-        if not lines:
+        # Parse owner/repo from HTTPS or SSH URL
+        m = re.search(r'github\.com[:/](.+?)(?:\.git)?$', remote_url)
+        if not m:
+            return {"has_update": False, "error": "Not a GitHub repo"}
+        repo_path = m.group(1)
+
+        # Call GitHub REST API (no auth needed for public repos)
+        api_url = f"https://api.github.com/repos/{repo_path}/commits?sha={branch}&per_page=20"
+        req = urllib.request.Request(api_url, headers={
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "VideoMixer-UpdateChecker",
+        })
+
+        def _fetch_api():
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return json.loads(resp.read())
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    return {"_error": "private_repo"}
+                raise
+
+        remote_commits = await asyncio.to_thread(_fetch_api)
+
+        # Handle private repo (GitHub API returns 404)
+        if isinstance(remote_commits, dict) and remote_commits.get("_error") == "private_repo":
+            return {
+                "has_update": False,
+                "local_sha": local_sha[:7],
+                "error": "仓库为私有，请在 GitHub 设置中将仓库改为 Public",
+            }
+
+        if not remote_commits:
             return {"has_update": False, "local_sha": local_sha[:7]}
 
-        commits = []
-        for line in lines[:5]:
-            parts = line.split(" ", 1)
-            commits.append({
-                "sha": parts[0],
-                "message": parts[1] if len(parts) > 1 else "",
+        # Find commits ahead of local HEAD
+        ahead_commits = []
+        found_local = False
+        for c in remote_commits:
+            if c["sha"] == local_sha:
+                found_local = True
+                break
+            ahead_commits.append({
+                "sha": c["sha"][:7],
+                "message": c["commit"]["message"].split("\n")[0],
             })
+
+        # If local HEAD not found in remote list, local is likely ahead — no update
+        if not found_local or not ahead_commits:
+            return {"has_update": False, "local_sha": local_sha[:7]}
 
         return {
             "has_update": True,
-            "ahead": len(lines),
+            "ahead": len(ahead_commits),
             "local_sha": local_sha[:7],
-            "commits": commits,
+            "commits": ahead_commits[:5],
         }
-    except asyncio.TimeoutError:
-        return {"has_update": False, "error": "fetch timeout"}
+    except urllib.error.URLError as e:
+        return {"has_update": False, "error": f"网络请求失败: {getattr(e, 'reason', str(e))}"}
     except Exception as e:
         return {"has_update": False, "error": str(e)}
 
@@ -581,6 +674,239 @@ async def open_folder(body: OpenFolderBody):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Upload / Download endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/upload")
+async def upload_files(
+    session_id: str = Form(...),
+    category: str = Form(...),
+    files: list[UploadFile] = File(...),
+):
+    """Upload video files into a session/category directory."""
+    safe_category = category.replace("/", "_").replace("\\", "_").strip()
+    if not safe_category:
+        raise HTTPException(400, "Invalid category name")
+
+    target_dir = UPLOADS_DIR / session_id / safe_category
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded = []
+    for f in files:
+        # Use basename only (webkitdirectory may include path prefix)
+        safe_name = Path(f.filename).name
+        ext = Path(safe_name).suffix.lower()
+        if ext not in VIDEO_EXTENSIONS:
+            continue
+        dest = target_dir / safe_name
+        with open(dest, "wb") as out:
+            while True:
+                chunk = await f.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+        uploaded.append(safe_name)
+
+    return {"uploaded": uploaded, "count": len(uploaded)}
+
+
+@app.get("/api/upload/{session_id}/scan")
+async def scan_uploads(session_id: str):
+    """Scan uploaded files for a session. Returns categories like /api/scan."""
+    session_dir = UPLOADS_DIR / session_id
+    if not session_dir.is_dir():
+        return {"path": str(session_dir), "categories": []}
+
+    categories = []
+    for sub in sorted(session_dir.iterdir()):
+        if sub.name.startswith('.') or not sub.is_dir():
+            continue
+        video_files = [f.name for f in sorted(sub.iterdir())
+                       if f.suffix.lower() in VIDEO_EXTENSIONS and not f.name.startswith('.')]
+        if not video_files:
+            continue
+
+        folder_lower = sub.name.lower()
+        strategy = "none"
+        for key, val in STRATEGY_MAP.items():
+            if key in folder_lower:
+                strategy = val
+                break
+
+        categories.append({
+            "folder": sub.name,
+            "path": str(sub),
+            "video_count": len(video_files),
+            "files": video_files,
+            "strategy": strategy,
+        })
+
+    return {"path": str(session_dir), "categories": categories}
+
+
+@app.delete("/api/upload/{session_id}/{category}/{filename}")
+async def delete_uploaded_file(session_id: str, category: str, filename: str):
+    """Delete a single uploaded file."""
+    target = UPLOADS_DIR / session_id / category / filename
+    if target.is_file():
+        target.unlink()
+        return {"ok": True}
+    raise HTTPException(404, "File not found")
+
+
+@app.delete("/api/upload/{session_id}/{category}")
+async def delete_uploaded_category(session_id: str, category: str):
+    """Delete an entire uploaded category."""
+    target = UPLOADS_DIR / session_id / category
+    if target.is_dir():
+        shutil.rmtree(target)
+        return {"ok": True}
+    raise HTTPException(404, "Category not found")
+
+
+@app.post("/api/tasks/upload")
+async def create_task_from_upload(body: UploadTaskBody):
+    """Create a mixing task from uploaded files."""
+    session_dir = UPLOADS_DIR / body.session_id
+    if not session_dir.is_dir():
+        raise HTTPException(400, "No uploads found for this session")
+
+    task_id = str(uuid.uuid4())[:8]
+    output_dir = OUTPUTS_DIR / task_id
+
+    cat_list = []
+    total = 0
+    for cat in body.categories:
+        folder_path = session_dir / cat.folder
+        if not folder_path.is_dir():
+            continue
+
+        # Build per-file configs from cat.files
+        file_configs = []
+        for fc in cat.files:
+            if not (folder_path / fc.filename).is_file():
+                continue
+            outputs = [{"mode": o.mode, "strategy_preset": o.strategy_preset} for o in fc.outputs]
+            if not outputs:
+                outputs = [{"mode": "standard", "strategy_preset": "D"}]
+            outputs = outputs[:10]
+            file_configs.append({"filename": fc.filename, "outputs": outputs})
+            total += len(outputs)
+
+        # Fallback: scan folder if frontend didn't send file list
+        if not file_configs:
+            video_files = [f.name for f in sorted(folder_path.iterdir())
+                           if f.suffix.lower() in VIDEO_EXTENSIONS and not f.name.startswith('.')]
+            for vf in video_files:
+                file_configs.append({
+                    "filename": vf,
+                    "outputs": [{"mode": "standard", "strategy_preset": "D"}],
+                })
+                total += 1
+
+        if file_configs:
+            cat_list.append({
+                "folder": cat.folder,
+                "strategy": cat.strategy,
+                "config": cat.config,
+                "files": file_configs,
+            })
+
+    if total == 0:
+        raise HTTPException(400, "No video files found in uploaded categories")
+
+    task = TaskState(
+        id=task_id,
+        input_dir=str(session_dir),
+        output_dir=str(output_dir),
+        categories=cat_list,
+        total_count=total,
+        created_at=time.time(),
+    )
+    tasks[task_id] = task
+    asyncio.get_event_loop().create_task(_run_task(task))
+
+    return {"task_id": task_id, "total": total}
+
+
+def _resolve_task_output(task_id: str) -> Path:
+    """Find the output directory for a task (workspace or history)."""
+    # First try workspace
+    wp = OUTPUTS_DIR / task_id
+    if wp.is_dir():
+        return wp
+    # Fallback: check history for old output_dir
+    history = _load_history()
+    for t in history.get("tasks", []):
+        if t.get("id") == task_id:
+            p = Path(t.get("output_dir", ""))
+            if p.is_dir():
+                return p
+            break
+    return wp  # return default even if missing (caller checks)
+
+
+@app.get("/api/download/{task_id}/list")
+async def list_downloads(task_id: str):
+    """List downloadable output files for a task."""
+    task_output = _resolve_task_output(task_id)
+    if not task_output.is_dir():
+        return {"task_id": task_id, "files": []}
+
+    files = []
+    for cat_dir in sorted(task_output.iterdir()):
+        if not cat_dir.is_dir():
+            continue
+        for video_file in sorted(cat_dir.iterdir()):
+            if video_file.suffix.lower() in VIDEO_EXTENSIONS:
+                size_mb = round(video_file.stat().st_size / (1024 * 1024), 1)
+                files.append({
+                    "category": cat_dir.name,
+                    "filename": video_file.name,
+                    "size_mb": size_mb,
+                    "url": f"/api/download/{task_id}/{cat_dir.name}/{video_file.name}",
+                })
+    return {"task_id": task_id, "files": files}
+
+
+@app.get("/api/download/{task_id}/{category}/{filename}")
+async def download_file(task_id: str, category: str, filename: str):
+    """Download a single processed file."""
+    task_output = _resolve_task_output(task_id)
+    file_path = task_output / category / filename
+    if not file_path.is_file():
+        raise HTTPException(404, "File not found")
+    return FileResponse(
+        str(file_path),
+        filename=filename,
+        media_type="application/octet-stream",
+    )
+
+
+@app.get("/api/download/{task_id}/all")
+async def download_all(task_id: str):
+    """Download all processed files as ZIP."""
+    task_output = _resolve_task_output(task_id)
+    if not task_output.is_dir():
+        raise HTTPException(404, "Task output not found")
+
+    zip_path = task_output / f"videomixer_{task_id}.zip"
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zf:
+        for cat_dir in sorted(task_output.iterdir()):
+            if not cat_dir.is_dir():
+                continue
+            for video_file in sorted(cat_dir.iterdir()):
+                if video_file.suffix.lower() in VIDEO_EXTENSIONS:
+                    zf.write(video_file, f"{cat_dir.name}/{video_file.name}")
+
+    return FileResponse(
+        str(zip_path),
+        filename=f"videomixer_{task_id}.zip",
+        media_type="application/zip",
+    )
+
+
 @app.websocket("/ws/env-install")
 async def ws_env_install(ws: WebSocket):
     """Stream brew install ffmpeg output."""
@@ -600,6 +926,49 @@ async def ws_env_install(ws: WebSocket):
     except FileNotFoundError:
         await ws.send_json({"type": "done", "success": False,
                             "error": "未找到 Homebrew，请先安装: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""})
+    except Exception as e:
+        await ws.send_json({"type": "done", "success": False, "error": str(e)})
+    finally:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+@app.websocket("/ws/git-pull")
+async def ws_git_pull(ws: WebSocket):
+    """Stream git pull output for manual updates."""
+    await ws.accept()
+    # Suppress ALL credential prompts (macOS keychain, terminal, etc.)
+    git_env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "/usr/bin/true",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "SSH_ASKPASS": "",
+    }
+    try:
+        process = await asyncio.create_subprocess_exec(
+            "git", "-c", "credential.helper=",
+            "-c", "credential.interactive=false",
+            "pull", "--ff-only",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=git_env,
+            cwd=str(PROJECT_ROOT),
+        )
+        async for line in process.stdout:
+            text = line.decode("utf-8", errors="replace").rstrip()
+            await ws.send_json({"type": "output", "line": text})
+        returncode = await process.wait()
+        await ws.send_json({
+            "type": "done",
+            "success": returncode == 0,
+            "error": "" if returncode == 0 else f"exit code {returncode}",
+        })
+    except FileNotFoundError:
+        await ws.send_json({"type": "done", "success": False,
+                            "error": "未找到 git 命令"})
     except Exception as e:
         await ws.send_json({"type": "done", "success": False, "error": str(e)})
     finally:
@@ -635,6 +1004,8 @@ async def create_task(body: CreateTaskBody):
             "strategy": cat.strategy,
             "files": video_files,
             "config": cat.config,
+            "mode": cat.mode,
+            "strategy_preset": cat.strategy_preset,
         })
         total += len(video_files)
 
@@ -677,6 +1048,12 @@ async def cancel_task(task_id: str):
     if not task:
         raise HTTPException(404, "Task not found")
     task.cancel_requested = True
+    # Kill running subprocess immediately
+    if task._current_proc and task._current_proc.returncode is None:
+        try:
+            task._current_proc.kill()
+        except Exception:
+            pass
     return {"ok": True}
 
 
@@ -732,6 +1109,19 @@ async def _run_task(task: TaskState):
     task.status = TaskStatus.RUNNING
     task.started_at = time.time()
 
+    # Open task log file
+    from datetime import datetime
+    log_file = LOGS_DIR / f"task_{task.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    task_log = open(log_file, "w", encoding="utf-8")
+
+    def _log(line: str):
+        task_log.write(line + "\n")
+        task_log.flush()
+
+    _log(f"[TASK] id={task.id} started at {datetime.now().isoformat()}")
+    _log(f"[TASK] input={task.input_dir} output={task.output_dir} total={task.total_count}")
+    _log(f"[TASK] categories={json.dumps(task.categories, ensure_ascii=False)}")
+
     # Save last I/O dirs
     try:
         cfg = _load_config()
@@ -751,92 +1141,140 @@ async def _run_task(task: TaskState):
     for cat in task.categories:
         strategy = cat["strategy"]
         folder = cat["folder"]
-        config = cat.get("config")
+        config = cat.get("config") or {}
 
         # Create output sub-directory
         out_sub = Path(task.output_dir) / folder
         out_sub.mkdir(parents=True, exist_ok=True)
 
-        for fname in cat["files"]:
-            if task.cancel_requested:
-                task.status = TaskStatus.CANCELLED
-                task.finished_at = time.time()
-                await _broadcast(task.id, {"type": "cancelled", "status": "cancelled"})
-                return
+        for file_cfg in cat["files"]:
+            fname = file_cfg["filename"]
+            outputs = file_cfg.get("outputs", [{"mode": "standard", "strategy_preset": "D"}])
 
-            input_path = str(Path(task.input_dir) / folder / fname)
-            output_path = str(out_sub / fname)
-            display_name = f"{folder}/{fname}"
+            for out_idx, out_cfg in enumerate(outputs):
+                mode = out_cfg.get("mode", "standard")
+                strategy_preset = out_cfg.get("strategy_preset", "D")
 
-            task.current_file = display_name
-            await _broadcast(task.id, {
-                "type": "file_start",
-                "filename": display_name,
-                "completed": task.completed_count,
-                "failed": task.failed_count,
-                "total": task.total_count,
-            })
+                # Check cancel
+                if task.cancel_requested:
+                    task.status = TaskStatus.CANCELLED
+                    task.finished_at = time.time()
+                    _log(f"[TASK] stopped by user")
+                    task_log.close()
+                    await _broadcast(task.id, {"type": "cancelled", "status": "cancelled"})
+                    return
 
-            t0 = time.time()
-            try:
-                cmd = [sys.executable, RUN_PROCESSOR, strategy, input_path, output_path, str(video_index)]
-                if config:
-                    cmd.append(json.dumps(config))
+                input_path = str(Path(task.input_dir) / folder / fname)
+                video_id = generate_video_id(category=strategy, strategy=strategy_preset or "D")
+                ext = Path(fname).suffix or ".mp4"
+                output_path = str(out_sub / f"{video_id}{ext}")
+                display_name = f"{folder}/{fname}" + (f" #{out_idx+1}" if len(outputs) > 1 else "")
 
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    cwd=str(PROJECT_ROOT),
-                )
+                # For concat mode, collect all files in this category
+                if mode == "concat":
+                    all_paths = [str(Path(task.input_dir) / folder / fc["filename"]) for fc in cat["files"]]
 
-                async for raw_line in proc.stdout:
-                    line = raw_line.decode("utf-8", errors="replace").rstrip()
-                    if line:
-                        await _broadcast(task.id, {
-                            "type": "file_log",
-                            "filename": display_name,
-                            "line": line,
-                        })
+                task.current_file = display_name
+                _log(f"\n[FILE] {display_name} | strategy={strategy} mode={mode} preset={strategy_preset}")
+                _log(f"[FILE] input={input_path}")
+                _log(f"[FILE] output={output_path}")
+                await _broadcast(task.id, {
+                    "type": "file_start",
+                    "filename": display_name,
+                    "completed": task.completed_count,
+                    "failed": task.failed_count,
+                    "total": task.total_count,
+                })
 
-                returncode = await proc.wait()
-                elapsed_s = round(time.time() - t0, 1)
-                success = returncode == 0
-                error = "" if success else f"exit code {returncode}"
-            except Exception as e:
-                elapsed_s = round(time.time() - t0, 1)
-                success = False
-                error = str(e)
+                t0 = time.time()
+                try:
+                    run_config = {**config, "_mode": mode, "_strategy_preset": strategy_preset}
+                    if mode == "concat":
+                        run_config["_input_paths"] = all_paths
 
-            video_index += 1
+                    cmd = [sys.executable, RUN_PROCESSOR, strategy, input_path, output_path, str(video_index)]
+                    cmd.append(json.dumps(run_config))
+                    _log(f"[CMD] {' '.join(cmd)}")
 
-            fr = {
-                "filename": display_name,
-                "status": "done" if success else "failed",
-                "elapsed": elapsed_s,
-                "error": error,
-            }
-            task.file_results.append(fr)
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        cwd=str(PROJECT_ROOT),
+                    )
+                    task._current_proc = proc
 
-            if success:
-                task.completed_count += 1
-            else:
-                task.failed_count += 1
+                    async for raw_line in proc.stdout:
+                        line = raw_line.decode("utf-8", errors="replace").rstrip()
+                        if line:
+                            _log(line)
+                            await _broadcast(task.id, {
+                                "type": "file_log",
+                                "filename": display_name,
+                                "line": line,
+                            })
 
-            await _broadcast(task.id, {
-                "type": "file_done",
-                "filename": display_name,
-                "result": fr,
-                "completed": task.completed_count,
-                "failed": task.failed_count,
-                "total": task.total_count,
-            })
+                    returncode = await proc.wait()
+                    task._current_proc = None
+                    elapsed_s = round(time.time() - t0, 1)
+
+                    # If killed by cancel, stop immediately
+                    if task.cancel_requested:
+                        task.status = TaskStatus.CANCELLED
+                        task.finished_at = time.time()
+                        _log(f"[TASK] stopped by user (killed subprocess)")
+                        task_log.close()
+                        await _broadcast(task.id, {"type": "cancelled", "status": "cancelled"})
+                        return
+
+                    success = returncode == 0
+                    error = "" if success else f"exit code {returncode}"
+                except Exception as e:
+                    elapsed_s = round(time.time() - t0, 1)
+                    task._current_proc = None
+                    success = False
+                    error = str(e)
+
+                video_index += 1
+
+                fr = {
+                    "filename": display_name,
+                    "video_id": video_id,
+                    "output_file": f"{video_id}{ext}",
+                    "folder": folder,
+                    "strategy": strategy,
+                    "mode": mode,
+                    "strategy_preset": strategy_preset,
+                    "status": "done" if success else "failed",
+                    "elapsed": elapsed_s,
+                    "error": error,
+                }
+                task.file_results.append(fr)
+
+                if success:
+                    task.completed_count += 1
+                    _log(f"[RESULT] {display_name} -> OK ({elapsed_s}s)")
+                else:
+                    task.failed_count += 1
+                    _log(f"[RESULT] {display_name} -> FAILED ({elapsed_s}s) {error}")
+
+                await _broadcast(task.id, {
+                    "type": "file_done",
+                    "filename": display_name,
+                    "result": fr,
+                    "completed": task.completed_count,
+                    "failed": task.failed_count,
+                    "total": task.total_count,
+                })
 
     task.status = TaskStatus.COMPLETED if task.failed_count == 0 else TaskStatus.FAILED
     task.finished_at = time.time()
     task.current_file = ""
 
     elapsed_total = round(task.finished_at - task.started_at, 1)
+
+    _log(f"\n[TASK] finished status={task.status.value} completed={task.completed_count} failed={task.failed_count} elapsed={elapsed_total}s")
+    task_log.close()
 
     await _broadcast(task.id, {
         "type": "finished",
@@ -849,14 +1287,15 @@ async def _run_task(task: TaskState):
 
     # Save to history
     try:
-        from datetime import datetime
         _append_history({
             "id": task.id,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
             "input_dir": task.input_dir,
             "output_dir": task.output_dir,
             "categories": [
-                {"folder": c["folder"], "strategy": c["strategy"], "count": len(c["files"])}
+                {"folder": c["folder"], "strategy": c["strategy"],
+                 "files": c.get("files", []),
+                 "count": sum(len(fc.get("outputs", [1])) for fc in c.get("files", []))}
                 for c in task.categories
             ],
             "total": task.total_count,
