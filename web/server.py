@@ -201,6 +201,7 @@ class TaskState:
     failed_count: int = 0
     total_count: int = 0
     file_results: list = field(default_factory=list)
+    source_name: str = ""
     cancel_requested: bool = False
     _current_proc: object = field(default=None, repr=False)
 
@@ -277,6 +278,7 @@ class CreateTaskBody(BaseModel):
 
 class UploadTaskBody(BaseModel):
     session_id: str
+    source_name: str = ""
     categories: list[CategoryInput]
 
 
@@ -833,6 +835,7 @@ async def create_task_from_upload(body: UploadTaskBody):
         categories=cat_list,
         total_count=total,
         created_at=time.time(),
+        source_name=body.source_name,
     )
     tasks[task_id] = task
     asyncio.get_event_loop().create_task(_run_task(task))
@@ -901,18 +904,25 @@ async def download_all(task_id: str):
     if not task_output.is_dir():
         raise HTTPException(404, "Task output not found")
 
-    zip_path = task_output / f"videomixer_{task_id}.zip"
+    task = tasks.get(task_id)
+    if task and task.source_name:
+        root_folder = f"{task.source_name}_已处理"
+    else:
+        root_folder = f"videomixer_{task_id}"
+    zip_name = f"{root_folder}.zip"
+
+    zip_path = task_output / zip_name
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zf:
         for cat_dir in sorted(task_output.iterdir()):
             if not cat_dir.is_dir():
                 continue
             for video_file in sorted(cat_dir.iterdir()):
                 if video_file.suffix.lower() in VIDEO_EXTENSIONS:
-                    zf.write(video_file, f"{cat_dir.name}/{video_file.name}")
+                    zf.write(video_file, f"{root_folder}/{cat_dir.name}/{video_file.name}")
 
     return FileResponse(
         str(zip_path),
-        filename=f"videomixer_{task_id}.zip",
+        filename=zip_name,
         media_type="application/zip",
     )
 
@@ -1177,7 +1187,8 @@ async def _run_task(task: TaskState):
                 input_path = str(Path(task.input_dir) / folder / fname)
                 video_id = generate_video_id(category=strategy, strategy=strategy_preset or "D")
                 ext = Path(fname).suffix or ".mp4"
-                output_path = str(out_sub / f"{video_id}{ext}")
+                output_fname = f"{video_id}{ext}"
+                output_path = str(out_sub / output_fname)
                 display_name = f"{folder}/{fname}" + (f" #{out_idx+1}" if len(outputs) > 1 else "")
 
                 # For concat mode, collect all files in this category
@@ -1253,7 +1264,7 @@ async def _run_task(task: TaskState):
                 fr = {
                     "filename": display_name,
                     "video_id": video_id,
-                    "output_file": f"{video_id}{ext}",
+                    "output_file": output_fname,
                     "folder": folder,
                     "strategy": strategy,
                     "mode": mode,

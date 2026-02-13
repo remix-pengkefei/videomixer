@@ -39,6 +39,7 @@
               <FileUploader
                 :session-id="sessionId"
                 @categories-changed="onCategoriesChanged"
+                @folder-name="uploadFolderName = $event"
               />
               <VideoList
                 v-if="categories.length > 0"
@@ -123,6 +124,7 @@ const fileResults = ref([])
 const elapsed = ref(0)
 const logLines = ref([])
 const allFiles = ref([])
+const uploadFolderName = ref('')
 
 let ws = null
 
@@ -186,6 +188,7 @@ async function startTask() {
   // All files share the same global outputs
   const body = {
     session_id: sessionId.value,
+    source_name: uploadFolderName.value || '',
     categories: categories.value.map(c => {
       const fileList = (c.files || []).map(f => ({
         filename: f,

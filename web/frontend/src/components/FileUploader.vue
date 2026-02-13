@@ -60,7 +60,7 @@ const props = defineProps({
   sessionId: { type: String, required: true },
 })
 
-const emit = defineEmits(['categoriesChanged'])
+const emit = defineEmits(['categoriesChanged', 'folderName'])
 
 const dragOver = ref(false)
 const uploadQueue = ref([])
@@ -80,15 +80,28 @@ async function pickFolder() {
   if (window.showDirectoryPicker) {
     try {
       const dirHandle = await window.showDirectoryPicker()
-      const files = []
+      // Collect videos grouped by subfolder
+      const groups = {} // { categoryName: [File, ...] }
+      const rootFiles = []
+      emit('folderName', dirHandle.name)
       for await (const entry of dirHandle.values()) {
         if (entry.kind === 'file') {
           const file = await entry.getFile()
-          if (isVideo(file.name)) files.push(file)
+          if (isVideo(file.name)) rootFiles.push(file)
+        } else if (entry.kind === 'directory') {
+          const subFiles = []
+          for await (const sub of entry.values()) {
+            if (sub.kind === 'file') {
+              const file = await sub.getFile()
+              if (isVideo(file.name)) subFiles.push(file)
+            }
+          }
+          if (subFiles.length > 0) groups[entry.name] = subFiles
         }
       }
-      if (files.length > 0) {
-        await doUpload(files, dirHandle.name)
+      if (rootFiles.length > 0) groups[dirHandle.name] = rootFiles
+      for (const [cat, files] of Object.entries(groups)) {
+        await doUpload(files, cat)
       }
       return
     } catch (e) {
@@ -134,10 +147,21 @@ async function onFolderInputChange(event) {
   const allFiles = Array.from(event.target.files || [])
   const videos = allFiles.filter(f => isVideo(f.name))
   if (videos.length > 0) {
-    // Extract folder name from webkitRelativePath (e.g. "FolderName/file.mp4")
-    const firstPath = videos[0].webkitRelativePath || ''
-    const folderName = firstPath.split('/')[0] || defaultCategory
-    await doUpload(videos, folderName)
+    // Group by parent subfolder via webkitRelativePath
+    // e.g. "视频0213/手写/手写1.mp4" → category "手写", parent "视频0213"
+    // e.g. "视频0213/file.mp4" → category "视频0213"
+    const groups = {}
+    const firstPath = (videos[0].webkitRelativePath || '').split('/')
+    if (firstPath.length >= 2) emit('folderName', firstPath[0])
+    for (const file of videos) {
+      const parts = (file.webkitRelativePath || file.name).split('/')
+      const cat = parts.length >= 3 ? parts[parts.length - 2] : (parts[0] || defaultCategory)
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(file)
+    }
+    for (const [cat, files] of Object.entries(groups)) {
+      await doUpload(files, cat)
+    }
   }
   event.target.value = ''
 }
@@ -165,8 +189,12 @@ async function handleDrop(event) {
   if (entries.length > 0) {
     for (const entry of entries) {
       if (entry.isDirectory) {
-        const files = await readDirectoryFiles(entry)
-        if (files.length > 0) await doUpload(files, entry.name)
+        emit('folderName', entry.name)
+        // Check for subdirectories first
+        const subGroups = await readDirectoryGrouped(entry)
+        for (const [cat, files] of Object.entries(subGroups)) {
+          if (files.length > 0) await doUpload(files, cat)
+        }
       } else if (entry.isFile) {
         const file = await getFileFromEntry(entry)
         if (file && isVideo(file.name)) {
@@ -235,19 +263,41 @@ function uploadSingleFile(file, category, queueItem) {
 }
 
 // --- Helpers for drag-drop directory reading ---
-async function readDirectoryFiles(dirEntry) {
+async function readDirectoryGrouped(dirEntry) {
+  // Returns { categoryName: [File, ...] }
+  // If dir has subdirectories with videos, each subdir is a category
+  // If dir has direct video files, they go under the dir's own name
+  const groups = {}
+  const rootFiles = []
+  const entries = await readAllEntries(dirEntry)
+  for (const entry of entries) {
+    if (entry.isFile) {
+      const file = await getFileFromEntry(entry)
+      if (file && isVideo(file.name)) rootFiles.push(file)
+    } else if (entry.isDirectory) {
+      const subEntries = await readAllEntries(entry)
+      const subFiles = []
+      for (const sub of subEntries) {
+        if (sub.isFile) {
+          const file = await getFileFromEntry(sub)
+          if (file && isVideo(file.name)) subFiles.push(file)
+        }
+      }
+      if (subFiles.length > 0) groups[entry.name] = subFiles
+    }
+  }
+  if (rootFiles.length > 0) groups[dirEntry.name] = rootFiles
+  return groups
+}
+
+function readAllEntries(dirEntry) {
   return new Promise((resolve) => {
     const reader = dirEntry.createReader()
     const result = []
     function readBatch() {
-      reader.readEntries(async (entries) => {
+      reader.readEntries((entries) => {
         if (entries.length === 0) { resolve(result); return }
-        for (const entry of entries) {
-          if (entry.isFile) {
-            const file = await getFileFromEntry(entry)
-            if (file && isVideo(file.name)) result.push(file)
-          }
-        }
+        result.push(...entries)
         readBatch()
       })
     }
