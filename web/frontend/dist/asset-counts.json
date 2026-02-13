@@ -1,0 +1,39 @@
+{
+  "stickers": {
+    "total": 92815,
+    "categories": {"adorable_things":80,"amusement_park":101,"ancient_architecture":51,"ancient_buildings":79,"ancient_scenes":99,"ancient_windows":88,"antique_frames":103,"baby_chicks":31,"baby_patterns":33,"backgrounds_24":24,"backgrounds_30":30,"balloon_sketches":150,"balloons":151,"birds":94,"birthday_cakes":107,"blackboard_sketches":67,"blush_ears":500,"bootstrap_icons":2078,"brand_icons":2968,"bread":55,"breakfast":50,"bunny_bottle_icons":40,"bunny_strawberry_icons":40,"butcher_shop":16,"butterflies":166,"cakes_icecream_sketches":13,"carousel_48":48,"carousel":84,"cartoon_black_sketches":49,"cartoon_cat_patterns":77,"cartoon_characters":100,"cartoon_cute_ears":101,"cartoon_dinosaurs":100,"cartoon_dog_patterns":37,"cartoon_emoji_icons":200,"cartoon_emoji_patterns":40,"cartoon_mini_cards":22,"cartoon_pattern_emoji":40,"cartoon_patterns_a":40,"cartoon_star_patterns":40,"cartoon_stars_192":132,"cartoon_stars_83":83,"castles":82,"cat_paws":31,"cats":77,"china_landmarks":11,"chinese_cuisine_a":62,"chinese_cuisine_b":62,"chinese_regional_food":105,"chinese_resized":10,"chinese_style_bg":84,"chinese_traditional_patterns":105,"chinese":10,"chips_oreo":66,"chocolate_desserts":84,"christmas":743,"circus":102,"cloud_ink_textures":12,"color_palettes":16,"convenience_store":102,"cookies_snacks":59,"cosmetics":67,"crayon_leaves_flowers":176,"cuisine_a":66,"cuisine_b":66,"cute_animal_faces":86,"cute_bunnies_a":40,"cute_bunnies_b":40,"cute_cartoon_elements":30,"cute_decorations":200,"cute_dinosaurs":102,"cute_line_drawings":219,"cute_space_doodles":52,"cute_style":32,"dalle":4,"dalle2":4,"dark_decorative_patterns":181,"donuts":28,"doodle_backgrounds":29,"doodle_dividers_bubbles":100,"download":24,"drinks_candy":27,"drinks":101,"emoji_github":1936,"emoji_noto_128":3768,"emoji_openmoji_72":4292,"emoji_openmoji":4292,"emoji_twemoji_72":3689,"emoji_twemoji":3689,"emojitwo":7378,"english_typography":102,"european_classical_elements":112,"european_classical_patterns":192,"fancy":4,"fantasy_girl_animal_patterns":80,"farm":159,"feather_icons":287,"flowers_38":38,"flowers_and_plants":611,"font_awesome":2860,"fontawesome":5720,"game_icons":4229,"green_fruits_vegetables":112,"green_plants":42,"grid_backgrounds":61,"grilled_skewers":42,"halloween_pumpkins":35,"halloween":89,"hamburgers":21,"hand_drawn_lines":30,"heart_elements":239,"heroicons":1612,"honey":40,"hotpot":26,"houses":102,"ice_cream":28,"ink_bamboo":201,"ink_landscape_paintings":286,"ionicons":1357,"japanese_food_stickers":199,"japanese_food":81,"japanese_oden":77,"japanese_plants":50,"japanese_travel":41,"kitchen_utensils_sketch":19,"kitchenware":394,"lace_borders":100,"landmarks_sketches":100,"large":17,"little_prince":31,"little_rabbits":31,"lotus_crane_tiger":21,"lucide_icons":1669,"makeup":17,"material_icons":7447,"milk_cartons":12,"mini_cards":22,"minimal_letters":10,"minimalist_style":57,"misc_generated":1790,"monsters":75,"moon":23,"navy_gold_watercolor_floral":44,"neon_holographic":1070,"new":6,"noto_emoji":4292,"octicons":724,"penguin_sam":36,"phosphor_icons":9072,"polka_dots":202,"pro":4,"quirky_style":88,"rabbits":40,"red_fruits_vegetables":196,"red_hearts":238,"sea_creatures":102,"selected":13,"shu_xiao_ai":25,"simple_icons":3397,"small_animals":167,"small_object_icons":50,"stationery":53,"sticky_notes":42,"strawberries":17,"summer_tropical":20,"tableware":38,"traditional_auspicious_patterns":98,"twinkling_stars":97,"vintage_blue_patterns":81,"vintage_european_clocks":12,"vintage_funny":42,"vintage_park_lines":17,"vintage_torn_paper_floral":13,"washi_tape":56,"watercolor_floral_borders":44,"watercolor_jellyfish":11,"watercolor_paintings":21,"watercolor_roses":36,"weather":74,"white_outlines":33,"white_rabbits":61,"world_architecture":100,"world_cuisine":70,"yellow_fruits_vegetables":63}
+  },
+  "sparkles": {
+    "total": 22438,
+    "styles": {"png":22438}
+  },
+  "overlays": {
+    "total": 5004,
+    "categories": {"abstract":1391,"bokeh":123,"confetti":128,"dust":39,"fire":532,"glitch":17,"lens_flare":25,"light":254,"neon":18,"particles_fx":738,"particles":177,"rain":281,"smoke":497,"snow":402,"sparkle":382}
+  },
+  "filler_videos": {"total": 2825},
+  "titles": {"total": 946},
+  "animated": {"total": 608},
+  "frames": {"total": 770},
+  "png_downloads": {"total": 751},
+  "mix_stickers": {"total": 763},
+  "particles": {"total": 907},
+  "intros": {"total": 1351},
+  "outros": {"total": 1703},
+  "transitions": {"total": 1345},
+  "effects": {
+    "color_schemes": 8,
+    "mask_styles": 5,
+    "particle_styles": 6,
+    "decoration_styles": 5,
+    "border_styles": 6,
+    "text_styles": 6,
+    "audio_effects": 5,
+    "color_presets": 8,
+    "lut_presets": 10,
+    "speed_ramps": 7,
+    "lens_effects": 9,
+    "glitch_effects": 8
+  },
+  "updated_at": "2026-02-13 15:10:12"
+}
