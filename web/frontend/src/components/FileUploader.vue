@@ -17,6 +17,25 @@
       <a class="drop-zone-file-link" @click.stop="pickFiles">选择单个视频文件上传</a>
     </div>
 
+    <!-- Hidden fallback inputs for non-secure contexts (http://IP access) -->
+    <input
+      ref="folderInput"
+      type="file"
+      multiple
+      webkitdirectory
+      :accept="VIDEO_EXTS.map(e => '.' + e).join(',')"
+      style="display:none"
+      @change="onFolderInputChange"
+    />
+    <input
+      ref="fileInput"
+      type="file"
+      multiple
+      :accept="VIDEO_EXTS.map(e => '.' + e).join(',')"
+      style="display:none"
+      @change="onFileInputChange"
+    />
+
     <!-- Upload progress -->
     <div v-if="uploadQueue.length > 0" class="upload-progress-list">
       <div v-for="item in uploadQueue" :key="item.id" class="upload-progress-item">
@@ -46,6 +65,8 @@ const emit = defineEmits(['categoriesChanged'])
 const dragOver = ref(false)
 const uploadQueue = ref([])
 const defaultCategory = '默认'
+const folderInput = ref(null)
+const fileInput = ref(null)
 
 const VIDEO_EXTS = ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm', 'flv', 'wmv']
 
@@ -56,44 +77,77 @@ function isVideo(name) {
 
 // --- Pick folder (click drop zone) ---
 async function pickFolder() {
-  try {
-    const dirHandle = await window.showDirectoryPicker()
-    const files = []
-    for await (const entry of dirHandle.values()) {
-      if (entry.kind === 'file') {
-        const file = await entry.getFile()
-        if (isVideo(file.name)) files.push(file)
+  if (window.showDirectoryPicker) {
+    try {
+      const dirHandle = await window.showDirectoryPicker()
+      const files = []
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file') {
+          const file = await entry.getFile()
+          if (isVideo(file.name)) files.push(file)
+        }
       }
+      if (files.length > 0) {
+        await doUpload(files, dirHandle.name)
+      }
+      return
+    } catch (e) {
+      // User cancelled
+      return
     }
-    if (files.length > 0) {
-      await doUpload(files, dirHandle.name)
-    }
-  } catch (e) {
-    // User cancelled
   }
+  // Fallback: traditional <input webkitdirectory>
+  folderInput.value?.click()
 }
 
 // --- Pick files (click link) ---
 async function pickFiles() {
-  try {
-    const handles = await window.showOpenFilePicker({
-      multiple: true,
-      types: [{
-        description: '视频文件',
-        accept: { 'video/*': VIDEO_EXTS.map(e => '.' + e) },
-      }],
-    })
-    const files = []
-    for (const h of handles) {
-      const file = await h.getFile()
-      if (isVideo(file.name)) files.push(file)
+  if (window.showOpenFilePicker) {
+    try {
+      const handles = await window.showOpenFilePicker({
+        multiple: true,
+        types: [{
+          description: '视频文件',
+          accept: { 'video/*': VIDEO_EXTS.map(e => '.' + e) },
+        }],
+      })
+      const files = []
+      for (const h of handles) {
+        const file = await h.getFile()
+        if (isVideo(file.name)) files.push(file)
+      }
+      if (files.length > 0) {
+        await doUpload(files, defaultCategory)
+      }
+      return
+    } catch (e) {
+      // User cancelled
+      return
     }
-    if (files.length > 0) {
-      await doUpload(files, defaultCategory)
-    }
-  } catch (e) {
-    // User cancelled
   }
+  // Fallback: traditional <input type="file" multiple>
+  fileInput.value?.click()
+}
+
+// --- Fallback input handlers ---
+async function onFolderInputChange(event) {
+  const allFiles = Array.from(event.target.files || [])
+  const videos = allFiles.filter(f => isVideo(f.name))
+  if (videos.length > 0) {
+    // Extract folder name from webkitRelativePath (e.g. "FolderName/file.mp4")
+    const firstPath = videos[0].webkitRelativePath || ''
+    const folderName = firstPath.split('/')[0] || defaultCategory
+    await doUpload(videos, folderName)
+  }
+  event.target.value = ''
+}
+
+async function onFileInputChange(event) {
+  const files = Array.from(event.target.files || []).filter(f => isVideo(f.name))
+  if (files.length > 0) {
+    await doUpload(files, defaultCategory)
+  }
+  event.target.value = ''
 }
 
 // --- Drag & Drop ---

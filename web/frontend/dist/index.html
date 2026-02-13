@@ -4,62 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VideoMixer</title>
-    <script>
-      if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
-        crypto.randomUUID = function() {
-          return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function(c) {
-            return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
-          });
-        };
-      }
-      // Override asset counts with real filesystem data
-      (function() {
-        var _fetch = window.fetch;
-        window.fetch = function(url, opts) {
-          if (typeof url === 'string' && url.indexOf('/api/assets/overview') !== -1) {
-            return _fetch('/asset-counts.json').then(function(r) {
-              return r.json();
-            }).then(function(real) {
-              return new Response(JSON.stringify(real), {
-                status: 200,
-                headers: {'Content-Type': 'application/json'}
-              });
-            }).catch(function() {
-              return _fetch(url, opts);
-            });
-          }
-          if (typeof url === 'string' && url.indexOf('/api/health') !== -1) {
-            return _fetch(url, opts).then(function(r) {
-              return r.json().then(function(data) {
-                return _fetch('/asset-counts.json').then(function(r2) {
-                  return r2.json();
-                }).then(function(real) {
-                  if (data.assets && data.assets.stickers) {
-                    data.assets.stickers.count = real.stickers.total;
-                    data.assets.stickers.exists = true;
-                  }
-                  if (data.assets && data.assets.sparkles) {
-                    data.assets.sparkles.count = real.sparkles.total;
-                    data.assets.sparkles.exists = true;
-                  }
-                  return new Response(JSON.stringify(data), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                  });
-                }).catch(function() {
-                  return new Response(JSON.stringify(data), {
-                    status: 200,
-                    headers: {'Content-Type': 'application/json'}
-                  });
-                });
-              });
-            });
-          }
-          return _fetch(url, opts);
-        };
-      })();
-    </script>
-    <script type="module" crossorigin src="/assets/index-DXRYWE2N.js"></script>
+    <script type="module" crossorigin src="/assets/index-BzrBya53.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-D62DXtSf.css">
   </head>
   <body>
